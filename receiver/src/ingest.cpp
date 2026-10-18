@@ -2,6 +2,8 @@
 #include "ingest.h"
 #include "../../include/posix.h"
 #include "../../include/iq8.h"
+#include "../usb/frames.h"
+#include "../usb/ring.h"
 
 #include <chrono>
 #include <cstring>
@@ -136,11 +138,16 @@ void SampleRing::put_packed(uint64_t run, uint64_t index, const uint32_t *packed
 {
     claim(index);
     uint32_t *out = &words_[(index & (slices_ - 1)) * kSliceSamples];
-    for (unsigned g = 0; g < kSliceSamples / 8; ++g, packed += 7, out += 8) {
+    const auto *bytes = reinterpret_cast<const uint8_t *>(packed);
+    for (unsigned g = 0; g < kSliceSamples / 8; ++g, bytes += 28, out += 8) {
+        // Ethernet payloads can be two-byte aligned. memcpy permits unaligned
+        // wire words without a whole-datagram copy or undefined C++ loads.
+        uint32_t words[7];
+        std::memcpy(words, bytes, sizeof(words));
         uint32_t tail = 0;
         for (unsigned k = 0; k < 7; ++k) {
-            out[k] = packed[k] & ~0xc000c000u;
-            tail |= (packed[k] & 0xc000c000u) >> (14 - 2 * k);
+            out[k] = words[k] & ~0xc000c000u;
+            tail |= (words[k] & 0xc000c000u) >> (14 - 2 * k);
         }
         out[7] = tail;
     }
@@ -165,25 +172,29 @@ struct Ingest::Worker {
     int fd = -1;
     std::thread thread;
     std::vector<uint8_t> buffers = std::vector<uint8_t>(kBatch * kDatagram);
+    std::unique_ptr<usb_rx::TransferRing> usb;
     // Written by this worker only, read by stats().
     std::atomic<uint64_t> datagrams{0}, bytes{0}, slices{0}, packed{0}, events{0}, pieces{0}, bad{0}, late{0},
         duplicates{0}, drops{0}, before{0}, spare{0}, stale{0}, stale_lines{0};
 };
 
-Ingest::Ingest(SampleRing &ring, const std::string &bind_ip, unsigned port, unsigned threads, unsigned ports)
+Ingest::Ingest(SampleRing &ring, const std::string &bind_ip, unsigned port, unsigned threads,
+               unsigned ports, const std::string &usb_ring)
     : ring_(ring), bind_ip_(bind_ip), port_(port),
 #ifdef __APPLE__
       threads_(ports),
 #else
       threads_(ports > 1 ? ports : threads),
 #endif
-      ports_(ports)
+      ports_(ports), usb_ring_(usb_ring)
 {
     if (!ports || ports > 64 || port + ports - 1 > 65535)
         throw std::runtime_error("invalid UDP port range");
     in_addr check;
     if (bind_ip.rfind("/dev/", 0) != 0 && inet_pton(AF_INET, bind_ip.c_str(), &check) != 1)
         throw std::runtime_error("not an IPv4 address: " + bind_ip);
+    if (!usb_ring.empty() && bind_ip.rfind("/dev/", 0) == 0)
+        throw std::runtime_error("USB and direct radio input cannot be combined");
 #ifdef __APPLE__
     // Darwin's SO_REUSEPORT does not provide Linux's UDP flow distribution.
     (void)threads;
@@ -195,6 +206,13 @@ Ingest::Ingest(SampleRing &ring, const std::string &bind_ip, unsigned port, unsi
 void Ingest::start()
 {
     if (!workers_.empty()) return;
+    if (!usb_ring_.empty()) {
+        auto w = std::make_unique<Worker>();
+        w->usb = std::make_unique<usb_rx::TransferRing>(usb_ring_, false, getuid());
+        workers_.push_back(std::move(w));
+        workers_[0]->thread = std::thread([this] { work_usb(*workers_[0]); });
+        return;
+    }
     if (bind_ip_.rfind("/dev/", 0) == 0) {
 #ifdef __linux__
         auto w = std::make_unique<Worker>();
@@ -273,6 +291,38 @@ Ingest::~Ingest()
 #ifdef __linux__
     if (device_map_) munmap(device_map_, device_bytes_);
 #endif
+}
+
+void Ingest::work_usb(Worker &w)
+{
+#ifdef __APPLE__
+    pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
+#endif
+    usb_rx::Filter filter;
+    inet_pton(AF_INET, bind_ip_.c_str(), filter.destination);
+    filter.port = uint16_t(port_); filter.ports = uint16_t(ports_);
+    usb_rx::Counters counts;
+    while (!stopping_.load(std::memory_order_relaxed)) {
+        const auto *slot = w.usb->front();
+        // USB batches arrive about every 0.8 ms at 160 Msps IQ8. Avoid
+        // waking ten times per millisecond while waiting for the next batch.
+        if (!slot) { usleep(500); continue; }
+        const uint64_t t = now_ns();
+        if (slot->length > usb_rx::slot_bytes) ++counts.malformed;
+        else usb_rx::aggregate(slot->data, slot->length, filter, counts,
+            [&](const uint8_t *data, size_t n) {
+                const uint64_t previous = last_ns_.exchange(t, std::memory_order_acq_rel);
+                take(w, data, n, previous && int64_t(t - previous) > int64_t(kRunGapNs), t);
+            });
+        // Malformed/failed network frames are additional to malformed IQ records.
+        // Reset this accumulator after charging it, keeping the existing stream counters.
+        w.bad.fetch_add(counts.malformed + counts.checksum_errors + counts.fragments, std::memory_order_relaxed);
+        counts.malformed = counts.checksum_errors = counts.fragments = 0;
+        w.usb->pop();
+    }
+    std::fprintf(stderr, "w1700k-stream: USB frames=%llu datagrams=%llu ignored=%llu dropped_transfers=%llu\n",
+        (unsigned long long)counts.frames, (unsigned long long)counts.datagrams,
+        (unsigned long long)counts.ignored, (unsigned long long)usb_rx::acquire(w.usb->header->dropped));
 }
 
 void Ingest::work_device(Worker &w)

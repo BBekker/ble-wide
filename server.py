@@ -40,8 +40,26 @@ class State:
         self.packets = deque(maxlen=HISTORY)
         self.spectrum = deque(maxlen=SPECTRUM_HISTORY)
         self.status = {}
+        self.receiver = {}
         self.updated = 0
         self.number = self.spectrum_number = self.revision = 0
+
+    def set_receiver(self, receiver):
+        with self.changed:
+            self.receiver = receiver
+            self.revision += 1
+            self.changed.notify_all()
+
+    def reset_capture(self):
+        with self.changed:
+            self.session = uuid.uuid4().hex
+            self.tracker = Tracker()
+            self.packets.clear()
+            self.spectrum.clear()
+            self.status = {}
+            self.updated = self.number = self.spectrum_number = 0
+            self.revision += 1
+            self.changed.notify_all()
 
     def ingest(self, event):
         with self.changed:
@@ -78,7 +96,7 @@ class State:
 
     def snapshot(self, after, spectrum_after=0):
         with self.lock:
-            return {**self.tracker.snapshot(after), "session": self.session, "status": self.status,
+            return {**self.tracker.snapshot(after), "session": self.session, "status": self.status, "receiver": self.receiver,
                     "active": time.monotonic()-self.updated < 2 and self.status.get("source_alive", False),
                     "packets": newer(self.packets, after), "cursor": self.number,
                     "spectrum": newer(self.spectrum, spectrum_after), "spectrum_cursor": self.spectrum_number,
@@ -115,6 +133,7 @@ def make_handler(state, bits=8):
                 self.end_headers()
                 self.connection.settimeout(5)
                 revision = -1
+                session = state.session
                 try:
                     while True:
                         with state.changed:
@@ -123,13 +142,23 @@ def make_handler(state, bits=8):
                         # Batching avoids one HTTP/event/render operation per packet.
                         if revision != -1:
                             time.sleep(.05)
-                        data = state.snapshot(after, spectrum_after)
+                        with state.lock:
+                            if state.session != session:
+                                after = spectrum_after = 0
+                                session = state.session
+                            data = state.snapshot(after, spectrum_after)
                         after, spectrum_after, revision = data["cursor"], data["spectrum_cursor"], data["revision"]
                         body = json.dumps(data, separators=(",", ":"), allow_nan=False)
-                        self.wfile.write(f"id: {state.session}:{after}:{spectrum_after}\ndata: {body}\n\n".encode())
+                        self.wfile.write(f"id: {data['session']}:{after}:{spectrum_after}\ndata: {body}\n\n".encode())
                         self.wfile.flush()
                 except (OSError, TimeoutError):
                     return
+            elif url.path == "/receiver":
+                with state.lock:
+                    data = json.dumps(dict(receiver=state.receiver,
+                        active=time.monotonic()-state.updated < 2 and state.status.get("source_alive", False),
+                        samples=state.status.get("samples", 0))).encode()
+                kind = "application/json"
             elif url.path == "/api":
                 data = json.dumps(state.snapshot(after, spectrum_after)).encode()
                 kind = "application/json"
@@ -179,20 +208,34 @@ def follow(path, state):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    source = p.add_mutually_exclusive_group(required=True)
+    source = p.add_mutually_exclusive_group()
     source.add_argument("--events", type=Path)
-    source.add_argument("--stream")
+    source.add_argument("--stream", help="Attach to an externally managed sample stream; do not take over its adapter")
+    source.add_argument("--receive", action="store_true", help="Manage reception automatically (the default)")
+    p.add_argument("--transport", choices=["auto", "udp", "usb"], default="auto")
+    p.add_argument("--usb-location", type=lambda s: int(s, 0), help="Explicit USB location ID (hex allowed); works without a stock-driver network interface")
+    p.add_argument("--bind", default="10.77.0.10", help="Router export destination on this computer")
+    p.add_argument("--ports", type=int, choices=range(1, 65), default=2, metavar="1..64")
+    p.add_argument("--name", default="/w1700k-iq4", help="Sample stream created by managed reception")
     p.add_argument("--backend", choices=["cpu", "metal", "auto"], default="auto")
     p.add_argument("--demod", choices=["legacy", "adaptive", "preamble", "streaming"], default="streaming")
     p.add_argument("--decode-threads", type=int, choices=range(1, 41), default=4, metavar="1..40", help="CPU packet decoding workers")
-    p.add_argument("--bits", type=int, choices=[4, 8], default=4)
+    p.add_argument("--bits", type=int, choices=[4, 8], default=8)
     p.add_argument("--port", type=int, default=8076)
     a = p.parse_args()
+    if a.usb_location is not None:
+        if not 0 < a.usb_location <= 0xffffffff:
+            p.error("--usb-location must be a nonzero 32-bit USB location ID")
+        if a.transport == 'udp' or a.stream or a.events:
+            p.error("--usb-location requires managed USB reception")
     state = State()
     child = None
+    runtime = None
     if a.events:
+        state.set_receiver(dict(transport="replay", phase="receiving", message="Recording playback"))
         threading.Thread(target=follow, args=(a.events, state), daemon=True).start()
-    else:
+    elif a.stream:
+        state.set_receiver(dict(transport="external", phase="receiving", message="Externally managed receiver"))
         child = subprocess.Popen([str(Path(__file__).with_name("build")/"w1700k-ble-wide"),
                                   "--stream", a.stream, "--backend", a.backend, "--demod", a.demod, "--decode-threads", str(a.decode_threads)], stdout=subprocess.PIPE, text=True)
         def read():
@@ -202,18 +245,25 @@ def main():
                 except (ValueError, KeyError, TypeError):
                     continue
         threading.Thread(target=read, daemon=True).start()
+    else:
+        from live_receiver import LiveReceiver
+        runtime = LiveReceiver(a, state)
     print(f"All-channel BLE viewer: http://127.0.0.1:{a.port}/", flush=True)
     def stop(*_):
         raise KeyboardInterrupt
     signal.signal(signal.SIGTERM, stop)
     try:
         with ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(state, a.bits)) as server:
+            if runtime:
+                runtime.start()
             server.timeout = .5
             while child is None or child.poll() is None:
                 server.handle_request()
     except KeyboardInterrupt:
         pass
     finally:
+        if runtime and runtime.thread.ident is not None:
+            runtime.stop()
         if child:
             child.terminate()
             try:

@@ -17,3 +17,16 @@ a Linux userspace interface, not firmware. Its SPDX license applies to that file
 
 Router firmware, DSP research, per-device credentials,
 recordings, compiler profiles and build outputs are not part of this repo.
+
+receiver/usb/helper.mm uses the RTL8157 register/enable sequence from Linux
+drivers/net/usb/r8152.c (Realtek and Linux contributors), commit 58161ead29e50d70a317ea26b472e0c7508e69da.
+That separate executable is GPL-2.0-only; see LICENSES/GPL-2.0.
+Other new USB transport/parser code carries its own MIT SPDX notice.
+
+receiver/usb/rtl8157-init.h and rtl8157-data.h port initialization and
+firmware/register tables from Realtek r8152 v2.22.1, Copyright (c) 2024
+Realtek Semiconductor Corp. All rights reserved., under GPL-2.0-only.
+Pinned source: https://github.com/awesometic/realtek-r8152-dkms/blob/d93c9f89ca5a831c9437e35319c546e48c710f9a/src/r8152.c
+receiver/usb/import-rtl8157.py reproduces the tables from that source and
+verifies its SHA-256 before importing. These files are compiled into the
+separate GPL-2.0-only helper; see LICENSES/GPL-2.0.

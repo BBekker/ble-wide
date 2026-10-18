@@ -1,0 +1,121 @@
+{
+  "hardware": "RTL8157 USB 0bda:8157 revision 0x3000, silicon 0x1030; M3 Pro",
+  "sample_format": "160 Msps complex IQ8, two records per datagram, 5 GbE",
+  "phy_firmware_upload": {
+    "from": "0x0000",
+    "to": "0x0014",
+    "bytes": 9888,
+    "readback_verified": true
+  },
+  "mac_firmware_upload": "Skipped on hardware: USB v3 / PLA v1 already present; simulated upload tested",
+  "tests": [
+    {
+      "name": "init-permanent",
+      "usb_reconfiguration": false,
+      "phy_power_down_verified": true,
+      "negotiated_mbps": 5000,
+      "usb": {
+        "seconds": 30.015855,
+        "usb_transfers": 163125,
+        "usb_bytes": 9401824320,
+        "mbps": 2505.829,
+        "errors": 0,
+        "ring_drops": 0,
+        "timeouts": 0,
+        "cpu_seconds": 5.126561,
+        "aggregate_kib": 64
+      },
+      "receiver_last_report": {
+        "run": 1,
+        "newest": 2222232,
+        "datagrams": 1106773,
+        "slices": 2213503,
+        "packed": 2213503,
+        "events": 0,
+        "lost": 976,
+        "overruns": 0,
+        "late": 0,
+        "duplicates": 0,
+        "bad": 0,
+        "socket_drops": 0,
+        "spare_words": 0,
+        "stale_slices": 0,
+        "stale_lines": 0,
+        "flatten_active": 0,
+        "flattened": 0,
+        "saturated": 0
+      },
+      "median_msps_per_nominal_one_second_report": 160.223232,
+      "crc_valid_packets": 3202,
+      "packet_records": 4035,
+      "decoder_final": {
+        "samples": 4646172672,
+        "packets": 3202,
+        "lost_samples": 1998848
+      },
+      "loss_counter_values": [
+        0,
+        976
+      ],
+      "crc_failed_packets": 833
+    },
+    {
+      "name": "init-final",
+      "usb_reconfiguration": true,
+      "phy_power_down_verified": true,
+      "negotiated_mbps": 5000,
+      "usb": {
+        "seconds": 30.019048,
+        "usb_transfers": 164319,
+        "usb_bytes": 9470888224,
+        "mbps": 2523.968,
+        "errors": 0,
+        "ring_drops": 0,
+        "timeouts": 0,
+        "cpu_seconds": 5.024129,
+        "aggregate_kib": 64
+      },
+      "receiver_last_report": {
+        "run": 1,
+        "newest": 2234192,
+        "datagrams": 1116464,
+        "slices": 2232928,
+        "packed": 2232928,
+        "events": 0,
+        "lost": 0,
+        "overruns": 0,
+        "late": 0,
+        "duplicates": 0,
+        "bad": 0,
+        "socket_drops": 0,
+        "spare_words": 0,
+        "stale_slices": 0,
+        "stale_lines": 0,
+        "flatten_active": 0,
+        "flattened": 0,
+        "saturated": 0
+      },
+      "median_msps_per_nominal_one_second_report": 160.19456,
+      "crc_valid_packets": 3057,
+      "packet_records": 3746,
+      "decoder_final": {
+        "samples": 4680591360,
+        "packets": 3057,
+        "lost_samples": 0
+      },
+      "loss_counter_values": [
+        0
+      ],
+      "crc_failed_packets": 689
+    }
+  ],
+  "limitations": [
+    "USB power was not physically removed; prior stock-driver initialization cannot be excluded.",
+    "Existing USB/PLA MAC patches were not overwritten on hardware.",
+    "Startup sample loss occurred; these are short captures, not a long-duration lossless qualification."
+  ],
+  "initial_failures": [
+    "With dynamic ARP, PHY-reset captures only received a few queued IQ packets then ARP; a permanent router ARP entry restored sustained data.",
+    "USB configuration before opening interface returned kIOReturnNotReady. Opening the existing interface first allowed 1 -> 0 -> 1 configuration while exclusive capture remained held."
+  ]
+}

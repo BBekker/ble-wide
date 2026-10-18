@@ -18,7 +18,7 @@ all: build/w1700k-stream
 build/w1700k-stream: $(OBJECTS)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-build/%.o: src/%.cpp $(wildcard src/*.h) ../include/w1700k_stream.h $(wildcard ../include/*.h) | build
+build/%.o: src/%.cpp $(wildcard src/*.h) $(wildcard usb/*.h) ../include/w1700k_stream.h $(wildcard ../include/*.h) | build
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 build:
@@ -31,3 +31,24 @@ install: build/w1700k-stream
 
 clean:
 	rm -rf build
+
+.PHONY: check-usb check-usb-init usb-helper
+build/test-init: usb/test-init.cpp usb/rtl8157-init.h usb/rtl8157-data.h | build
+	$(CXX) $(CXXFLAGS) $< -o $@
+check-usb-init: build/test-init
+	./build/test-init
+build/test-usb: usb/test-usb.cpp usb/frames.h usb/ring.h | build
+	$(CXX) $(CXXFLAGS) $< -o $@
+check-usb: build/test-usb
+	./build/test-usb
+ifeq ($(shell uname -s),Darwin)
+usb-helper: build/BLEUSBHelper.app/Contents/MacOS/rtl8157-helper
+build/BLEUSBHelper.app/Contents/MacOS/rtl8157-helper: usb/helper.mm usb/power.h usb/ring.h usb/rtl8157-init.h usb/rtl8157-data.h usb/Info.plist
+	mkdir -p build/BLEUSBHelper.app/Contents/MacOS
+	cp usb/Info.plist build/BLEUSBHelper.app/Contents/Info.plist
+	/usr/bin/clang++ -std=c++17 -O3 -Wall -Wextra -Werror -fobjc-arc $< -o $@ -framework Foundation -framework IOKit -framework IOUSBHost
+	/usr/bin/codesign --force --sign - build/BLEUSBHelper.app
+else
+usb-helper:
+	@echo 'The direct USB helper currently requires macOS.' >&2; exit 1
+endif

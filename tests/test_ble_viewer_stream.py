@@ -24,6 +24,32 @@ def packet(n):
 
 
 class ViewerStreamTest(unittest.TestCase):
+    def test_open_event_stream_resets_cursor_after_transport_fallback(self):
+        state = viewer.State()
+        state.ingest(packet(1));state.ingest(packet(2))
+        server = ThreadingHTTPServer(('127.0.0.1', 0), viewer.make_handler(state))
+        thread = threading.Thread(target=server.serve_forever, daemon=True);thread.start()
+        conn = http.client.HTTPConnection('127.0.0.1', server.server_port, timeout=3)
+        try:
+            conn.request('GET', '/events');response = conn.getresponse()
+            def event():
+                while True:
+                    line = response.readline().decode()
+                    if line.startswith('data: '):
+                        return json.loads(line[6:])
+            before = event()
+            state.set_receiver(dict(transport='udp', phase='receiving', message='Fallback'))
+            state.reset_capture();state.ingest(packet(3))
+            after = event()
+            while after['session'] == before['session'] or not after['packets']:
+                after = event()
+            self.assertNotEqual(before['session'], after['session'])
+            self.assertEqual([p['id'] for p in after['packets']], [1])
+            self.assertEqual(after['receiver']['transport'], 'udp')
+            response.close()
+        finally:
+            conn.close();server.shutdown();server.server_close();thread.join()
+
     def test_crc_failures_are_retained_without_trusting_their_contents(self):
         import copy
         state=viewer.State()
