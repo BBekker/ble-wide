@@ -10,7 +10,7 @@ format/shared-memory interfaces from that working tree; no router checkout
 is needed to build. airspace/advertisements.py derives from host/ble/server.py.
 The test bit sequence is identified in tests/python/fixtures.py.
 
-The receiver/ UDP ingest service and include/{fft.h,posix.h} and mk/platform.mk also
+The receiver/ UDP ingest service and include/posix.h and mk/platform.mk also
 come from host/stream and host/common in that working tree.
 include/uapi/w1700k_sdr.h retains GPL-2.0 WITH Linux-syscall-note; it is
 a Linux userspace interface, not firmware. Its SPDX license applies to that file.

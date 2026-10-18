@@ -3,12 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
-#ifdef W1700K_PORTABLE_FFT
-#include "channelizer/fft80.h"
-using fftwf_complex = float[2];
-#else
 #include <fftw3.h>
-#endif
 #include <stdexcept>
 
 // 160 Msps -> eighty 2 Msps bins. A 1 MHz input translation puts every
@@ -17,18 +12,12 @@ class Channelizer {
     static constexpr int N = 80, T = 16;
     alignas(64) float history[T][N * 2]{}, coefficients[T][N * 2]{};
     float oscillator[160][2]{};
-#ifdef W1700K_PORTABLE_FFT
-    alignas(64) fftwf_complex input[80]{}, output[80]{};
-    FFT80 fft;
-#else
     fftwf_complex *input, *output;
     fftwf_plan plan;
-#endif
     int head = 0, position = 0, phase = 0;
 
   public:
     Channelizer() {
-#ifndef W1700K_PORTABLE_FFT
         input = fftwf_alloc_complex(N);
         output = fftwf_alloc_complex(N);
         if (!input || !output)
@@ -36,7 +25,6 @@ class Channelizer {
         plan = fftwf_plan_dft_1d(N, input, output, FFTW_BACKWARD, FFTW_MEASURE);
         if (!plan)
             throw std::runtime_error("FFT plan failed");
-#endif
         constexpr double pi = 3.14159265358979323846;
         double h[N * T], sum = 0;
         for (int k = 0; k < N * T; k++) {
@@ -54,11 +42,9 @@ class Channelizer {
         }
     }
     ~Channelizer() {
-#ifndef W1700K_PORTABLE_FFT
         fftwf_destroy_plan(plan);
         fftwf_free(input);
         fftwf_free(output);
-#endif
     }
     Channelizer(const Channelizer &) = delete;
     void reset() {
@@ -82,11 +68,7 @@ class Channelizer {
                 for (int p = 0; p < 2 * N; p++)
                     v[p] += x[p] * h[p];
             }
-#ifdef W1700K_PORTABLE_FFT
-            fft.run(input, output);
-#else
             fftwf_execute(plan);
-#endif
             emit(output);
             head = (head + 1) % T;
         }

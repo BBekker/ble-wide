@@ -1,13 +1,15 @@
 # SPDX-License-Identifier: MIT
-# w1700k-stream: a C++17 compiler and FFTW3 (single precision). Tune for the build host with
+# w1700k-stream: a C++17 compiler. Tune for the build host with
 # CXXFLAGS="-O3 -march=native".
 CXX ?= c++
-include ../mk/platform.mk
+ifneq ($(shell uname -s),Darwin)
+RT_LIBS := -lrt
+endif
 CXXFLAGS ?= -O3
 WARNINGS ?= -Wall -Wextra -Werror
 PREFIX ?= /usr/local
-override CXXFLAGS += -std=c++17 -pthread -I../include -Iusb $(FFTW_CFLAGS) $(WARNINGS)
-LDLIBS += -pthread $(FFTW_LIBS) $(RT_LIBS)
+override CXXFLAGS += -std=c++17 -pthread -I../include -Iusb $(WARNINGS)
+LDLIBS += -pthread $(RT_LIBS)
 
 SOURCES := $(wildcard src/*.cpp)
 OBJECTS := $(patsubst src/%.cpp,build/%.o,$(SOURCES))
@@ -15,10 +17,10 @@ OBJECTS := $(patsubst src/%.cpp,build/%.o,$(SOURCES))
 .PHONY: all clean install
 all: build/w1700k-stream
 
-build/w1700k-stream: $(OBJECTS)
-	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
+build/w1700k-stream: $(OBJECTS) Makefile
+	$(CXX) $(LDFLAGS) $(OBJECTS) $(LDLIBS) -o $@
 
-build/%.o: src/%.cpp $(wildcard src/*.h) $(wildcard usb/*.h) ../include/w1700k_stream.h $(wildcard ../include/*.h) | build
+build/%.o: src/%.cpp Makefile $(wildcard src/*.h) $(wildcard usb/*.h) ../include/w1700k_stream.h $(wildcard ../include/*.h) | build
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 build:

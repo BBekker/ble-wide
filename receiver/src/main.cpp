@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 // w1700k-stream: receives the W1700K's UDP export and serves it to every consumer on this host
-// through shared memory (include/w1700k_stream.h): in order, unpacked to complex int16, and on
-// request corrected for the radio's decimation roll-off (flatten.h).
+// through shared memory (include/w1700k_stream.h): in order, unpacked to complex int16.
 #include <atomic>
 #include <chrono>
 #include <cinttypes>
@@ -34,7 +33,6 @@ void usage()
                  "  --port N          its UDP port (default 7700)\n"
                  "  --ports N         consecutive UDP ports, one receiver per port (default 1)\n"
                  "  --rx-threads N    UDP sockets and receive threads (default 8)\n"
-                 "  --workers N       unpacking and correction threads (default 6)\n"
                  "  --ring-mib N      the shared sample ring, a power of two (default 512: 0.42 s at 320 Msps)\n"
                  "  --name NAME       the shared-memory object (default /w1700k-stream)\n"
                  "  --report S        a JSON status line every S seconds (default 0: none)\n");
@@ -62,7 +60,7 @@ int main(int argc, char **argv)
     pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0);
 #endif
     std::string bind = "10.77.0.10", name = W1700K_STREAM_NAME, usb_ring;
-    unsigned ports = 1, port = 7700, rx_threads = 8, workers = 6, ring_mib = 512, receive_mib = 256, report = 0;
+    unsigned ports = 1, port = 7700, rx_threads = 8, ring_mib = 512, receive_mib = 256, report = 0;
     try {
         for (int i = 1; i < argc; ++i) {
             const std::string arg = argv[i];
@@ -80,7 +78,6 @@ int main(int argc, char **argv)
             else if (arg == "--port") port = positive(arg, value(), 65535);
             else if (arg == "--ports") ports = positive(arg, value(), 64);
             else if (arg == "--rx-threads") rx_threads = positive(arg, value(), 64);
-            else if (arg == "--workers") workers = positive(arg, value(), 64);
             else if (arg == "--ring-mib") ring_mib = positive(arg, value(), 1u << 16);
             else if (arg == "--name") name = value();
             else if (arg == "--report") report = positive(arg, value(), 3600);
@@ -105,7 +102,7 @@ int main(int argc, char **argv)
         SharedRing shared(name, ring_mib * 128);
         SampleRing received(receive_mib * 128);
         Ingest ingest(received, bind, port, rx_threads, ports, usb_ring);
-        Publisher publisher(received, ingest, shared.header(), workers);
+        Publisher publisher(received, ingest, shared.header());
         publisher.start();
         ingest.start();
         shared.ready();
@@ -122,10 +119,9 @@ int main(int argc, char **argv)
                         ",\"packed\":%" PRIu64 ",\"events\":%" PRIu64 ",\"lost\":%" PRIu64 ",\"overruns\":%" PRIu64 ",\"late\":%" PRIu64
                         ",\"duplicates\":%" PRIu64 ",\"bad\":%" PRIu64 ",\"socket_drops\":%" PRIu64
                         ",\"spare_words\":%" PRIu64 ",\"stale_slices\":%" PRIu64 ",\"stale_lines\":%" PRIu64
-                        ",\"flatten_active\":%" PRIu64 ",\"flattened\":%" PRIu64 ",\"saturated\":%" PRIu64 "}\n",
+                        "}\n",
                         run, newest, h->datagrams, h->slices, h->packed, h->events, h->lost, h->overruns, h->late, h->duplicates,
-                        h->bad, h->socket_drops, h->spare_words, h->stale_slices, h->stale_lines, h->flatten_active,
-                        h->flattened, h->saturated);
+                        h->bad, h->socket_drops, h->spare_words, h->stale_slices, h->stale_lines);
             std::fflush(stdout);
         }
     } catch (const std::exception &e) {

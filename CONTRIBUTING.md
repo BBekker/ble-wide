@@ -35,7 +35,6 @@ docs/
   assets/               Project artwork
   benchmarks/           Transport measurements and hardware validation results
   research/             Historical decoder experiments and provenance
-experiments/browser/    Incomplete WASM/browser receiver prototype
 ```
 
 Application code belongs in `airspace/`, not the root launch shims. Run the viewer with `python3 -m airspace` from the checkout. `python3 server.py` and `from live_receiver import detect_adapter` remain available for existing router launchers. Executables stay at `build/w1700k-ble-wide` and `receiver/build/w1700k-stream`, so the router exporter does not depend on the internal source layout.
@@ -57,8 +56,6 @@ Native private headers use component-qualified includes such as `decoder/streami
 Focused targets such as `check-streaming`, `check-metal` (macOS), and `check-packet-noise` remain available. USB tests in the default suite use synthetic data and simulated register operations; they do not take over an Ethernet adapter or request administrator privileges.
 
 `make clean` removes compiled products while retaining local profiles, captures, and diagnostic logs. Profiles are specific to source/compiler builds; regenerate local profiles after substantial source moves, or use `PROFILE=` to verify an unprofiled build.
-
-The experimental browser receiver is outside the default build and test suite. Its Emscripten and Node dependencies are separate from the supported Airspace web UI.
 
 ## Measurements and contributions
 

@@ -1,9 +1,7 @@
 # SPDX-License-Identifier: MIT
 """w1700k-stream against a fake export over loopback, read through its shared memory: samples
-unpacked bit-exact, events and losses tagged, the roll-off correction's gain where it applies and
-nowhere else, runs restarted on request, and the export's integrity counted."""
-import cmath
-import math
+unpacked bit-exact, events and losses tagged, runs restarted on request, and the export's
+integrity counted."""
 import os
 import shutil
 import signal
@@ -14,7 +12,7 @@ import time
 import unittest
 
 import stream_shm
-from stream_shm import TAG_EVENT, TAG_FLAT, TAG_LOST, Shm, tag
+from stream_shm import TAG_EVENT, TAG_LOST, Shm, tag
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 STREAM = os.path.join(ROOT, "receiver")
@@ -22,25 +20,10 @@ BINARY = os.path.join(STREAM, "build", "w1700k-stream")
 MAGIC = 0x31524453
 SLICE = stream_shm.SLICE
 
-# The 320 Msps roll-off (receiver/src/flatten.cpp), dB at k/64 of Nyquist.
-ROLLOFF_320 = [0.0] * 29 + [
-    -0.1, -0.2, -0.3, -0.5, -0.6, -0.8, -1.1, -1.4, -1.7, -2.0, -2.4, -2.8, -3.2, -3.6, -4.1, -4.6, -5.1,
-    -5.7, -6.3, -6.9, -7.6, -8.4, -9.2, -10.1, -11.0, -12.0, -13.0, -14.0, -15.2, -16.4, -17.8, -19.1,
-    -20.5, -21.7, -22.6, -23.1]
-
-
-def rolloff_320(x):
-    x = min(max(x, 0.0), 1.0) * 64
-    k = min(int(x), 63)
-    return ROLLOFF_320[k] + (x - k) * (ROLLOFF_320[k + 1] - ROLLOFF_320[k])
-
-
 def build_problem():
     if not shutil.which("make") or not shutil.which(os.environ.get("CXX", "c++")):
         return "no make or C++ compiler"
-    probe = subprocess.run([os.environ.get("CXX", "c++"), "-x", "c++", "-fsyntax-only", *stream_shm.fftw_flags(), "-"],
-                           input="#include <fftw3.h>\n", text=True, capture_output=True)
-    return "FFTW3 headers missing" if probe.returncode else None
+    return None
 
 
 def free_udp_port(count=1):
@@ -78,11 +61,6 @@ def noise_words(seed):
     return [((seed * 7919 + n) * 2654435761) & 0x3FFF3FFF for n in range(SLICE)]
 
 
-def tone_words(cycles, amplitude):
-    return [word(round(amplitude * math.cos(2 * math.pi * cycles * n / SLICE)),
-                 round(amplitude * math.sin(2 * math.pi * cycles * n / SLICE))) for n in range(SLICE)]
-
-
 def pack(words):
     out = []
     for g in range(0, len(words), 8):
@@ -93,12 +71,6 @@ def pack(words):
 
 def unpacked(words):
     return [(signed14(w >> 16 & 0x3FFF), signed14(w & 0x3FFF)) for w in words]
-
-
-def tone_amplitude(samples, cycles):
-    """|correlation with the slice's complex exponential at `cycles`| / N."""
-    acc = sum(complex(i, q) * cmath.exp(-2j * math.pi * cycles * n / SLICE) for n, (i, q) in enumerate(samples))
-    return abs(acc) / SLICE
 
 
 @unittest.skipIf(build_problem(), build_problem())
@@ -117,7 +89,7 @@ class StreamServiceTest(unittest.TestCase):
         self.ports = 2 if self._testMethodName == "test_two_ports_merge_by_dma_sequence" else 1
         self.port = free_udp_port(self.ports)
         self.proc = subprocess.Popen([BINARY, "--bind", "127.0.0.1", "--port", str(self.port), "--name", self.name,
-                                      "--ring-mib", "16", "--workers", "2", "--rx-threads", "2", "--ports", str(self.ports)],
+                                      "--ring-mib", "16", "--rx-threads", "2", "--ports", str(self.ports)],
                                      stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         deadline = time.monotonic() + 10
         while True:
@@ -180,7 +152,6 @@ class StreamServiceTest(unittest.TestCase):
             self.assertEqual(self.shm.samples(s), unpacked(words[s]), "slot %d" % s)
         self.assertEqual((self.shm.get("packed"), self.shm.get("events"), self.shm.get("lost")), (1, 1, 1))
         self.assertEqual(self.shm.get("slices"), 1198)
-        self.assertEqual(self.shm.get("flatten_active"), 0)
 
     def test_iq4_scale_sign_and_malformed_packets(self):
         payload = bytes(range(256)) * 8
@@ -286,72 +257,25 @@ class StreamServiceTest(unittest.TestCase):
             self.assertEqual(self.shm.tag(seq), tag(run, seq))
             self.assertEqual(self.shm.samples(seq), unpacked(noise_words(seq)))
 
-    def test_switch_between_direct_and_corrected_publishing(self):
-        for field in ("radio_sample_rate", "radio_capture_rate", "radio_filter_hz"):
-            self.shm.set(field, 320000000)
-        words = tone_words(768, 600)
+    def test_idle_tail_published_without_a_full_chunk(self):
+        # Each burst ends before another full 16-slot chunk. Publication must
+        # finish on idle, including an event that carries no samples.
         seq = 0
-        for enabled in (0, 1, 0, 1, 0):
-            self.shm.set("flatten", enabled)
-            deadline = time.monotonic() + 5
-            while self.shm.get("flatten_active") != enabled:
-                self.assertLess(time.monotonic(), deadline)
-                time.sleep(0.01)
+        for count in (1, 15, 17, 65):
             first = seq
-            for _ in range(65):  # includes an incomplete final chunk
-                self.send_words(seq, words)
+            for offset in range(count):
+                if offset == 2:
+                    self.send(seq, bytes(64))
+                else:
+                    self.send_words(seq, noise_words(seq))
                 seq += 1
             run = self.wait_newest(seq)
             for index in range(first, seq):
-                self.assertEqual(self.shm.tag(index), tag(run, index) | (TAG_FLAT if enabled else 0))
-                if not enabled:
-                    self.assertEqual(self.shm.samples(index), unpacked(words))
+                event = index - first == 2
+                self.assertEqual(self.shm.tag(index), tag(run, index) | (TAG_EVENT if event else 0))
+                if not event:
+                    self.assertEqual(self.shm.samples(index), unpacked(noise_words(index)))
             self.assertEqual(self.shm.get("lost"), 0)
-        self.assertEqual(self.shm.get("flattened"), 130)
-
-    def test_flatten_gain_follows_the_measured_rolloff(self):
-        for field, value in (("radio_sample_rate", 320000000), ("radio_capture_rate", 320000000),
-                             ("radio_filter_hz", 320000000), ("flatten", 1)):
-            self.shm.set(field, value)
-        deadline = time.monotonic() + 5
-        while self.shm.get("flatten_active") != 1:
-            self.assertLess(time.monotonic(), deadline, "the correction never applied")
-            time.sleep(0.01)
-        # Tones of integer cycles per slice (continuous across slices), 48 slices each.
-        plan = [256, 768, -768, 922, 963]
-        amplitude = 600
-        seq = 0
-        for cycles in plan:
-            w = tone_words(cycles, amplitude)
-            for _ in range(48):
-                self.send_words(seq, w)
-                seq += 1
-        run = self.wait_newest(seq)
-        self.assertEqual((self.shm.get("flatten_active"), self.shm.get("flatten_rate")), (1, 320000000))
-        for k, cycles in enumerate(plan):
-            s = 48 * k + 24                            # well inside the tone's block
-            self.assertEqual(self.shm.tag(s), tag(run, s) | TAG_FLAT)
-            got = 20 * math.log10(tone_amplitude(self.shm.samples(s), cycles) / amplitude)
-            want = -rolloff_320(abs(cycles) / 1024)
-            self.assertAlmostEqual(got, want, delta=0.4, msg="%d cycles: %.2f dB, want %.2f" % (cycles, got, want))
-        self.assertEqual(self.shm.get("saturated"), 0)
-        self.assertEqual(self.shm.get("flattened"), seq)
-
-    def test_no_correction_unless_the_filter_matches_the_rate(self):
-        for field, value in (("radio_sample_rate", 320000000), ("radio_capture_rate", 320000000),
-                             ("radio_filter_hz", 160000000), ("flatten", 1)):
-            self.shm.set(field, value)
-        words = noise_words(7)
-        for s in range(40):
-            self.send_words(s, words)
-        run = self.wait_newest(40)
-        self.assertEqual(self.shm.get("flatten_active"), 0)
-        self.assertEqual(self.shm.tag(5), tag(run, 5))
-        self.assertEqual(self.shm.samples(5), unpacked(words))
-        self.shm.set("radio_filter_hz", 320000000)
-        self.shm.set("radio_capture_rate", 640000000)  # 640/2: flat already, no correction
-        time.sleep(0.3)
-        self.assertEqual(self.shm.get("flatten_active"), 0)
 
     def test_restart_and_integrity_counters(self):
         base = [noise_words(s) for s in range(128)]

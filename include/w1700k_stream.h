@@ -7,16 +7,15 @@
  *
  * Layout: the header (4 KiB), then one 64-bit tag per slot, then the samples: per slot one slice
  * of W1700K_STREAM_SLICE complex samples, int16 I then int16 Q, on the scale of the radio's 14-bit
- * samples (full scale W1700K_STREAM_FULL_SCALE). The int16 range above it is headroom for the
- * correction filter's gain; a sample beyond it saturates and is counted.
+ * samples (full scale W1700K_STREAM_FULL_SCALE).
  *
  * Slot `index & (ring_slices - 1)` holds slice `index` of run `run` (a run is one stream, numbered
  * from 1; `index` counts the unit's DMA completions from the run's first, 0..). Its tag is
  * w1700k_stream_tag(run, index), with W1700K_STREAM_TAG_EVENT for a firmware event (no samples and
  * no sample time: the slices either side are contiguous), W1700K_STREAM_TAG_LOST for a completion
- * that never arrived (no samples; the sample time is lost), and W1700K_STREAM_TAG_FLAT on a slice
- * the correction filter produced. A reader reads the tag (acquire), the samples, then the tag
- * again: a changed tag means the service overwrote the slot meanwhile (a seqlock).
+ * that never arrived (no samples; the sample time is lost). A reader reads the tag (acquire),
+ * the samples, then the tag again: a changed tag means the service overwrote the slot meanwhile
+ * (a seqlock).
  *
  * The service publishes slots in index order. `newest` is the frontier: every slot of the run
  * below it is final. Read run and newest together with w1700k_stream_position().
@@ -42,8 +41,8 @@
 
 #define W1700K_STREAM_TAG_EVENT		(1ull << 63)
 #define W1700K_STREAM_TAG_LOST		(1ull << 62)
-#define W1700K_STREAM_TAG_FLAT		(1ull << 61)
-#define W1700K_STREAM_TAG_KIND		(W1700K_STREAM_TAG_EVENT | W1700K_STREAM_TAG_LOST | W1700K_STREAM_TAG_FLAT)
+/* Bit 61 is reserved for compatibility with older version-1 producers. */
+#define W1700K_STREAM_TAG_KIND		(W1700K_STREAM_TAG_EVENT | W1700K_STREAM_TAG_LOST | (1ull << 61))
 
 struct w1700k_stream_header {
 	/* layout, fixed at creation */
@@ -71,23 +70,15 @@ struct w1700k_stream_header {
 	 * equal to the same slice or line one lap (128 completions) earlier: a capture or packer
 	 * that repeated old data */
 	uint64_t spare_words, stale_slices, stale_lines;
-	uint64_t flattened, saturated;	/* slices the correction produced; samples clipped to int16 */
+	uint64_t reserved_counters[2];	/* retired correction counters; retain ABI offsets */
 	uint64_t overruns;		/* of the lost: arrived, but overwritten in the service's receive
 					 * ring before it was published (the service fell behind) */
 	uint64_t reserved2[12];
 
 	/* control: written by consumers, read by the service */
 	uint64_t restart_requests;	/* +1: the next completion starts a new run */
-	uint64_t flatten;		/* 1: correct the decimation's roll-off where it applies */
-	uint64_t radio_sample_rate;	/* samples/s; 0: unknown */
-	uint64_t radio_capture_rate;	/* samples/s before the stream (640/2: 640e6); 0: unknown */
-	uint64_t radio_filter_hz;	/* the analog filter's width; 0: unknown */
-	uint64_t reserved3[11];
-
-	/* the service's view of the control */
-	uint64_t flatten_active;	/* the correction applies to the slices being published */
-	uint64_t flatten_rate;		/* the sample rate whose correction applies; 0: none */
-	uint64_t reserved4[14];
+	uint64_t reserved3[15];	/* retired correction controls and reserved words */
+	uint64_t reserved4[16];	/* retired correction status and reserved words */
 };
 
 #define w1700k_stream_load(p)		__atomic_load_n((p), __ATOMIC_ACQUIRE)

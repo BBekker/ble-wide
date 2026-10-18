@@ -159,7 +159,7 @@ Run the regression suites:
 ./tools/run make -C receiver usb-helper check-usb check-usb-init  # macOS USB path
 ```
 
-Build outputs and local compiler profiles are ignored by Git. A regular build requires no profile; `make PROFILE=` explicitly disables one. The historical [research notes](docs/research/README.md) preserve experiments and measurements; old paths there are provenance, not current launch instructions. `experiments/browser/` is an incomplete WASM experiment, separate from the supported viewer.
+Build outputs and local compiler profiles are ignored by Git. A regular build requires no profile; `make PROFILE=` explicitly disables one. The historical [research notes](docs/research/README.md) preserve experiments and measurements; old paths there are provenance, not current launch instructions.
 
 The [contributor guide](CONTRIBUTING.md) describes the project layout and focused test commands. The small root `server.py` and `live_receiver.py` files preserve compatibility with existing router launchers; application code lives in `airspace/`.
 

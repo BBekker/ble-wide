@@ -2,8 +2,8 @@
 #include "publish.h"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
-#include <cmath>
 #include <cstring>
 #include <stdexcept>
 
@@ -14,7 +14,7 @@
 
 namespace {
 
-constexpr unsigned kChunk = 16;            // slots per job
+constexpr unsigned kChunk = 16;            // minimum slots per active-stream pass
 constexpr uint64_t kHorizon = 1024;        // a slot this far behind the newest completion received is lost
 constexpr uint64_t kIdleNs = 5000000;      // nothing new for this long: publish what has arrived
 constexpr uint64_t kReportNs = 100000000;  // heartbeat and counters
@@ -88,24 +88,14 @@ SharedRing::~SharedRing()
 
 // ---- the publisher --------------------------------------------------------------------------------
 
-struct Publisher::Worker {
-    std::thread thread;
-    FlattenRun flatten;
-    std::vector<Slot> kinds;
-    std::vector<float> in, out;
-};
-
-Publisher::Publisher(const SampleRing &raw, Ingest &ingest, w1700k_stream_header *out, unsigned workers)
-    : raw_(raw), ingest_(ingest), out_(out), worker_count_(std::max(1u, workers))
+Publisher::Publisher(const SampleRing &raw, Ingest &ingest, w1700k_stream_header *out)
+    : raw_(raw), ingest_(ingest), out_(out)
 {
 }
 
 void Publisher::start()
 {
-    if (scheduler_.joinable()) return;
-    for (unsigned i = 0; i < worker_count_; ++i) workers_.push_back(std::make_unique<Worker>());
-    for (auto &w : workers_) w->thread = std::thread([this, p = w.get()] { work(*p); });
-    scheduler_ = std::thread([this] { schedule(); });
+    if (!scheduler_.joinable()) scheduler_ = std::thread([this] { schedule(); });
 }
 
 Publisher::~Publisher()
@@ -114,19 +104,8 @@ Publisher::~Publisher()
         std::lock_guard<std::mutex> lock(mutex_);
         stopping_ = true;
     }
-    work_ready_.notify_all();
-    job_done_.notify_all();
+    wake_.notify_one();
     if (scheduler_.joinable()) scheduler_.join();
-    for (auto &w : workers_)
-        if (w->thread.joinable()) w->thread.join();
-}
-
-const Flatten *Publisher::correction() const
-{
-    if (!load(&out_->flatten)) return nullptr;
-    const uint64_t rate = load(&out_->radio_sample_rate);
-    if (!rate || load(&out_->radio_capture_rate) != rate || load(&out_->radio_filter_hz) != rate) return nullptr;
-    return Flatten::for_rate(double(rate));
 }
 
 void Publisher::publish_position(uint64_t run, uint64_t newest)
@@ -156,28 +135,26 @@ void Publisher::report()
     store(&out_->spare_words, s.spare_words);
     store(&out_->stale_slices, s.stale_slices);
     store(&out_->stale_lines, s.stale_lines);
-    store(&out_->lost, lost_.load());
-    store(&out_->overruns, overruns_.load());
-    store(&out_->flattened, flattened_.load());
-    store(&out_->saturated, saturated_.load());
+    store(&out_->lost, lost_);
+    store(&out_->overruns, overruns_);
     store(&out_->received, s.newest);
     store(&out_->run_started_ns, uint64_t(s.run_started * 1e9));
     store(&out_->last_any_ns, uint64_t(s.last_any * 1e9));
     store(&out_->heartbeat_ns, w1700k_stream_now_ns());
 }
 
-// One thread walks the receive ring in order: a slot is resolved when its completion (samples or
-// an event) is in, or when kHorizon newer ones are and it is not (lost). Whole chunks of resolved
-// slots go to the workers, with one more resolved slot after them when the correction needs
-// samples beyond the chunk; an idle stream's tail goes as it is. Finished chunks are published in
-// order.
+// Walk the receive ring in order. A slot is resolved when its completion is in,
+// or kHorizon newer completions have arrived without it. Unpack up to 128 resolved
+// slots per pass; an idle stream also publishes an incomplete chunk.
 void Publisher::schedule()
 {
-    Worker direct;
-    uint64_t run = 0, resolved = 0, dispatched = 0, published = 0, sequence = 0, next_publish = 0;
+    uint64_t run = 0, resolved = 0, published = 0;
     uint64_t seen_newest = 0, seen_at = 0, reported = 0, restarts = load(&out_->restart_requests);
-    const Flatten *active = nullptr;
     for (;;) {
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (stopping_) return;
+        }
         const uint64_t t = w1700k_stream_now_ns();
         if (t - reported >= kReportNs) {
             report();
@@ -191,19 +168,8 @@ void Publisher::schedule()
 
         const Ingest::Position p = ingest_.position();
         if (p.run != run) {
-            // A new stream: the old one's chunks finish and are published, then it starts over.
-            std::unique_lock<std::mutex> lock(mutex_);
-            job_done_.wait(lock, [&] { return stopping_ || (jobs_.empty() && !busy_); });
-            if (stopping_) return;
-            for (auto it = done_.find(next_publish); it != done_.end(); it = done_.find(next_publish)) {
-                published = it->second.last;
-                done_.erase(it);
-                ++next_publish;
-            }
-            lock.unlock();
-            if (run) publish_position(run, published);
             run = p.run;
-            resolved = dispatched = published = 0;
+            resolved = published = 0;
             seen_newest = 0;
             publish_position(run, 0);
         }
@@ -212,7 +178,6 @@ void Publisher::schedule()
             seen_at = t;
         }
         const bool idle = t - seen_at > kIdleNs;
-
         while (resolved < p.newest) {
             const uint64_t tag = raw_.tag(resolved);
             if (tag == SampleRing::tag_of(run, resolved) || tag == SampleRing::event_tag_of(run, resolved) ||
@@ -221,85 +186,19 @@ void Publisher::schedule()
             else
                 break;
         }
-
-        const Flatten *f = correction();
-        if (f != active) {  // what applies, as soon as it changes
-            active = f;
-            store(&out_->flatten_active, uint64_t(f != nullptr));
-            store(&out_->flatten_rate, f ? uint64_t(f->rate()) : uint64_t(0));
+        if (resolved >= published + kChunk || (idle && resolved > published)) {
+            const uint64_t last = std::min(resolved, published + 128);
+            process(run, published, last);
+            published = last;
+            publish_position(run, published);
+            continue;
         }
-        bool waiting = true;
-        {
-            std::unique_lock<std::mutex> lock(mutex_);
-            if (stopping_) return;
-            // Plain unpacking is a short, memory-bound pass. Do it here instead
-            // of waking a worker and scheduling a second wakeup to publish it.
-            // Drain earlier correction jobs first when flatten is switched off.
-            if (!f && jobs_.empty() && !busy_ && done_.empty() &&
-                (resolved >= dispatched + kChunk || (idle && resolved > dispatched))) {
-                Job job{sequence, run, dispatched, std::min(resolved, dispatched + 128), nullptr, idle};
-                lock.unlock();
-                process(direct, job);
-                dispatched = published = job.last;
-                publish_position(run, published);
-                continue;
-            }
-            while (f && jobs_.size() + busy_ < 2 * worker_count_) {
-                Job job{sequence, run, dispatched, 0, f, false};
-                if (resolved >= dispatched + kChunk + (f ? 1 : 0)) {
-                    job.last = dispatched + kChunk;
-                } else if (idle && resolved > dispatched) {
-                    job.last = resolved;
-                    job.flush = true;
-                } else {
-                    break;
-                }
-                jobs_.push_back(job);
-                ++sequence;
-                dispatched = job.last;
-                waiting = false;
-                work_ready_.notify_one();
-            }
-            bool moved = false;
-            for (auto it = done_.find(next_publish); it != done_.end(); it = done_.find(next_publish)) {
-                published = it->second.last;
-                done_.erase(it);
-                ++next_publish;
-                moved = true;
-            }
-            if (moved) {
-                lock.unlock();
-                publish_position(run, published);
-                continue;
-            }
-            if (waiting) job_done_.wait_for(lock, std::chrono::microseconds(200));
-        }
+        std::unique_lock<std::mutex> lock(mutex_);
+        wake_.wait_for(lock, std::chrono::microseconds(200), [&] { return stopping_; });
     }
 }
 
-void Publisher::work(Worker &w)
-{
-    for (;;) {
-        Job job;
-        {
-            std::unique_lock<std::mutex> lock(mutex_);
-            work_ready_.wait(lock, [&] { return stopping_ || !jobs_.empty(); });
-            if (stopping_) return;
-            job = jobs_.front();
-            jobs_.pop_front();
-            ++busy_;
-        }
-        process(w, job);
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            --busy_;
-            done_[job.sequence] = job;
-        }
-        job_done_.notify_all();
-    }
-}
-
-Publisher::Slot Publisher::classify(uint64_t run, uint64_t index, bool) const
+Publisher::Slot Publisher::classify(uint64_t run, uint64_t index) const
 {
     const uint64_t tag = raw_.tag(index);
     if (tag == SampleRing::tag_of(run, index)) return Slot::Data;
@@ -315,7 +214,7 @@ bool Publisher::overrun(uint64_t run, uint64_t index) const
     return (tag >> 40) == run && (tag & ((uint64_t(1) << 40) - 1)) > index + 1;
 }
 
-void Publisher::process(Worker &w, const Job &job)
+void Publisher::process(uint64_t run, uint64_t first, uint64_t last)
 {
     uint64_t *tags = w1700k_stream_tags(out_);
     const uint64_t mask = out_->ring_slices - 1;
@@ -324,119 +223,33 @@ void Publisher::process(Worker &w, const Job &job)
         std::atomic_thread_fence(std::memory_order_release);
     };
     auto finish = [&](uint64_t index, uint64_t kind) {
-        __atomic_store_n(&tags[index & mask], w1700k_stream_tag(job.run, index) | kind, __ATOMIC_RELEASE);
+        __atomic_store_n(&tags[index & mask], w1700k_stream_tag(run, index) | kind, __ATOMIC_RELEASE);
     };
 
-    w.kinds.resize(job.last - job.first);
-    for (uint64_t s = job.first; s < job.last; ++s) w.kinds[s - job.first] = classify(job.run, s, job.flush);
-
-    if (!job.flatten) {
-        uint64_t lost = 0, overruns = 0;
-        for (uint64_t s = job.first; s < job.last; ++s) {
-            const Slot kind = w.kinds[s - job.first];
-            if (kind == Slot::Event) {
-                finish(s, W1700K_STREAM_TAG_EVENT);
-                continue;
-            }
-            if (kind == Slot::Data) {
-                claim(s);
-                const uint32_t *words = raw_.slice(s);
-                int16_t *dst = w1700k_stream_slice(out_, s);
-                for (unsigned k = 0; k < kSliceSamples; ++k) {
-                    dst[2 * k] = i_of(words[k]);
-                    dst[2 * k + 1] = q_of(words[k]);
-                }
-                if (raw_.tag(s) == SampleRing::tag_of(job.run, s)) {
-                    finish(s, 0);
-                    continue;
-                }
-            }
-            finish(s, W1700K_STREAM_TAG_LOST);  // never arrived, or overwritten while being copied
-            ++lost;
-            if (overrun(job.run, s)) ++overruns;
-        }
-        if (lost) lost_ += lost;
-        if (overruns) overruns_ += overruns;
-        return;
-    }
-
-    // The correction: the chunk's samples with kDelay before and after it. Events take no sample
-    // time (skipped); lost completions and anything before the run or not yet arrived are zeros.
-    const unsigned D = Flatten::kDelay;
-    auto samples_of = [&](uint64_t s, unsigned from, unsigned count, float *out) {
-        if (s < job.first || s >= job.last ? classify(job.run, s, false) == Slot::Data : w.kinds[s - job.first] == Slot::Data) {
-            const uint32_t *words = raw_.slice(s);
-            for (unsigned k = 0; k < count; ++k) {
-                out[2 * k] = i_of(words[from + k]);
-                out[2 * k + 1] = q_of(words[from + k]);
-            }
-        } else {
-            std::fill(out, out + 2 * count, 0.0f);
-        }
-    };
-    size_t n = 0;
-    for (const Slot k : w.kinds) n += k == Slot::Event ? 0 : kSliceSamples;
-    w.in.assign(2 * (n + 2 * D), 0.0f);
-    // before: walk back over the slots that hold samples (an event holds none)
-    {
-        unsigned need = D;
-        for (uint64_t s = job.first; need && s-- > 0;) {
-            if (classify(job.run, s, false) == Slot::Event) continue;
-            const unsigned take = std::min(need, kSliceSamples);
-            need -= take;
-            samples_of(s, kSliceSamples - take, take, &w.in[2 * need]);
-        }
-    }
-    {
-        float *at = &w.in[2 * D];
-        for (uint64_t s = job.first; s < job.last; ++s) {
-            if (w.kinds[s - job.first] == Slot::Event) continue;
-            samples_of(s, 0, kSliceSamples, at);
-            at += 2 * kSliceSamples;
-        }
-        unsigned need = D;
-        for (uint64_t s = job.last; need && s < job.last + 4; ++s) {
-            if (classify(job.run, s, false) == Slot::Event) continue;
-            const unsigned take = std::min(need, kSliceSamples);
-            samples_of(s, 0, take, at);
-            at += 2 * take;
-            need -= take;
-        }
-    }
-    w.out.resize(2 * n);
-    w.flatten.apply(*job.flatten, w.in.data(), n, w.out.data());
-
-    uint64_t lost = 0, overruns = 0, flat = 0, clipped = 0;
-    const float *y = w.out.data();
-    for (uint64_t s = job.first; s < job.last; ++s) {
-        const Slot kind = w.kinds[s - job.first];
+    uint64_t lost = 0, overruns = 0;
+    for (uint64_t s = first; s < last; ++s) {
+        const Slot kind = classify(run, s);
         if (kind == Slot::Event) {
             finish(s, W1700K_STREAM_TAG_EVENT);
             continue;
         }
         if (kind == Slot::Data) {
             claim(s);
+            const uint32_t *words = raw_.slice(s);
             int16_t *dst = w1700k_stream_slice(out_, s);
-            for (unsigned k = 0; k < 2 * kSliceSamples; ++k) {
-                const float v = std::nearbyint(y[k]);
-                const float c = std::min(std::max(v, -32768.0f), 32767.0f);
-                clipped += c != v;
-                dst[k] = int16_t(c);
+            for (unsigned k = 0; k < kSliceSamples; ++k) {
+                dst[2 * k] = i_of(words[k]);
+                dst[2 * k + 1] = q_of(words[k]);
             }
-            if (raw_.tag(s) == SampleRing::tag_of(job.run, s)) {
-                finish(s, W1700K_STREAM_TAG_FLAT);
-                ++flat;
-                y += 2 * kSliceSamples;
+            if (raw_.tag(s) == SampleRing::tag_of(run, s)) {
+                finish(s, 0);
                 continue;
             }
         }
-        finish(s, W1700K_STREAM_TAG_LOST);
+        finish(s, W1700K_STREAM_TAG_LOST);  // never arrived, or overwritten while being copied
         ++lost;
-        if (overrun(job.run, s)) ++overruns;
-        y += 2 * kSliceSamples;
+        if (overrun(run, s)) ++overruns;
     }
     if (lost) lost_ += lost;
     if (overruns) overruns_ += overruns;
-    if (flat) flattened_ += flat;
-    if (clipped) saturated_ += clipped;
 }

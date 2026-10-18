@@ -1,15 +1,14 @@
 # w1700k-stream
 
-The host's one receiver of the W1700K's UDP export. It puts the stream in order, unpacks it and
-serves it, as complex int16 IQ, to every consumer on the host through shared memory:
-`w1700k-spectrum`, `sdr-recv`, or any program that maps the ring. On request it also corrects
-the stream for the radio's decimation roll-off ("flatten"), in the samples themselves, so that
-every consumer gets the corrected stream.
+The sample receiver ingests the W1700K's export over UDP or direct USB, puts it in
+order, and unpacks it to complex int16 IQ in shared memory. `w1700k-ble-wide`
+reads that ring for channelization and decoding. The receiver does not filter
+or equalize the samples.
 
 ## Build and run
 
-Needs a C++17 compiler and FFTW3 in single precision (Debian/Ubuntu:
-`apt install g++ make libfftw3-dev`).
+Needs a C++17 compiler and Make (Debian/Ubuntu: `apt install g++ make`).
+FFTW is needed by the BLE decoder, not this receiver.
 
 ```sh
 make                                   # build/w1700k-stream
@@ -22,7 +21,6 @@ build/w1700k-stream                    # until Ctrl-C; consumers attach any time
 | `--bind IP` | `10.77.0.10` | the stream's destination address on this host (the 10G link) |
 | `--port N` | `7700` | its UDP port |
 | `--rx-threads N` | 8 | UDP sockets and receive threads (`SO_REUSEPORT`; the unit spreads its source ports) |
-| `--workers N` | 6 | threads that unpack and correct |
 | `--ring-mib N` | 512 | the shared ring, a power of two (512 MiB holds 0.42 s at 320 Msps) |
 | `--name NAME` | `/w1700k-stream` | the shared-memory object (`/dev/shm/w1700k-stream`) |
 | `--report S` | 0 | a JSON status line on stdout every S seconds |
@@ -48,7 +46,7 @@ SDR1 formats remain unchanged; four-bit export is explicitly launched separately
 
 Completions are filed by `seq` into a reorder ring (256 MiB, 0.2 s at 320 Msps). A run, one stream, begins with the
 first datagram after a second of silence, after a jump in `seq`, or after a consumer asks for one
-(`restart_requests`, which the spectrum server does when the receiver starts or stops). Slots are
+(`restart_requests`). Slots are
 published in order: one whose completion has arrived, a firmware event, or, once 1024 newer
 completions have arrived without it, a loss. After 5 ms with nothing new, what has arrived is
 published; a loss at the very end of a stream stays unpublished until more arrives. Of the
@@ -72,40 +70,20 @@ layout, the tag rules and helpers to map the object and read the position. In sh
   that consumers write.
 - One 64-bit tag per slot: `(run << 40) | (index + 1)`, `index` counting the run's completions from
   0, plus a kind: `TAG_EVENT` (no samples, no sample time: the slices either side are contiguous),
-  `TAG_LOST` (no samples; the sample time is lost), `TAG_FLAT` (corrected samples).
+  `TAG_LOST` (no samples; the sample time is lost). Bit 61 remains reserved for older producers.
 - Per slot one slice: 2048 complex samples, int16 I then int16 Q, on the scale of the radio's
-  14-bit samples (full scale 8192). Uncorrected samples are the radio's, bit for bit; the int16
-  range above them is the correction's headroom (a sample beyond it saturates, counted).
+  14-bit samples (full scale 8192). Sample values are preserved after unpacking and scale restoration.
 
 A reader reads a slot's tag (acquire), its samples, then the tag again: a changed tag means the
-slot was overwritten meanwhile.
-
-## The correction ("flatten")
-
-Every sample rate's decimation attenuates the band's edges, signal and noise alike: about -2 dB
-at 62 % of Nyquist, -13 dB at 87 %, -22 dB at 99 % (research ledger D293). The correction is a
-129-tap linear-phase FIR (Kaiser window) whose response is the inverse of that roll-off as
-measured on unit A, per rate, capped at +24 dB; it is applied zero-phase (every corrected sample
-keeps its index) by overlap-save FFTs, across slice boundaries, with events skipped and losses as
-zeros. Its response is within 0.15 dB of the inverse up to 0.95 x Nyquist.
-
-It applies when a consumer asks for it (`flatten` = 1) and the radio's state, which the consumer
-also writes (`radio_sample_rate`, `radio_capture_rate`, `radio_filter_hz`), says the analog filter
-is as wide as the sample rate and the stream is not 640/2 (which is flat already); the service
-reports what applies in `flatten_active` and `flatten_rate`. The spectrum server writes these
-from the receiver's controller and the page's Flatten toggle.
-
-Measured on unit A, band 1 at 320 Msps, from the receiver's noise floor (relative to 15..45 % of
-Nyquist): without the correction -1.7 / -6.4 / -14.2 / -19.8 / -22.8 dB at 62.5 / 75 / 87.5 / 94 /
-97 % of Nyquist; with it +0.9 / +0.5 / +0.1 / -0.4 / -1.1 dB. The service used 0.8 CPU cores
-without it and 1.8 with it, with no loss.
+slot was overwritten meanwhile. Retired correction fields are reserved words, so
+the version-1 shared-memory layout and offsets remain unchanged.
 
 ## Tests
 
-`python3 -m unittest discover -s tests -p test_stream.py` from the repository root (`make check`
+`python3 -m unittest discover -s tests/python -p test_stream.py` from the repository root (`make check`
 runs it) builds the service and runs it against a fake export over loopback.
 
-The experimental IQ81 format (`host/common/iq8.h`) additionally carries 2048
+The experimental IQ81 format (`include/iq8.h`) additionally carries 2048
 complex samples as signed eight-bit I/Q pairs, with a shared scale shift 0–7.
 It is automatically recognized alongside IQ41 and SDR1; all are reconstructed
 onto the same signed 14-bit amplitude scale in shared memory. At 160 Msps,
@@ -135,18 +113,17 @@ to use `recvmmsg` and receive-overflow ancillary data.
 
 On ARM NEON, IQ81 reconstruction widens, scales and clips eight complex samples
 at once, preserving the scalar decoder's values at all eight scale shifts.
-Without roll-off correction, the publisher converts resolved slots directly
+The publisher converts resolved slots directly
 on its scheduling thread, avoiding a worker handoff and completion wakeup for
 each 16-slot job. It processes up to 128 available slots per pass without
-waiting for 128 to arrive. Correction still uses the worker pool; outstanding
-correction jobs finish before direct publication resumes.
+waiting for 128 to arrive. There is no separate publication worker pool.
 
 Measure the surrounding system as well as this process:
 
 ```sh
-python3 tools/iq4/measure-mac-network.py --interface en10 --seconds 30
+python3 tools/benchmarks/measure-mac-network.py --interface en10 --seconds 30
 # After stopping capture, measure the background load:
-python3 tools/iq4/measure-mac-network.py --interface en10 --seconds 30 --no-viewer
+python3 tools/benchmarks/measure-mac-network.py --interface en10 --seconds 30 --no-viewer
 ```
 
 Run these from the repository root. The tool records total user/kernel CPU,
