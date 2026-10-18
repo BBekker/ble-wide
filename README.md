@@ -56,7 +56,7 @@ brew install fftw pkg-config llvm node
 With the router **already configured and exporting** to this computer:
 
 ```sh
-python3 server.py --bits 8 --backend metal --decode-threads 4
+python3 -m airspace --bits 8 --backend metal --decode-threads 4
 ```
 
 Open **[localhost:8076](http://127.0.0.1:8076/)**. The viewer manages both the sample receiver and decoder. Streaming decoding is the default. Use `--backend cpu` on Linux.
@@ -79,7 +79,7 @@ Direct USB currently supports **macOS + RTL8157 revision `0x3000`**. Discovery i
 For an adapter with no stock-driver network interface, select its actual IORegistry location explicitly:
 
 ```sh
-python3 server.py --backend metal --transport usb --usb-location 0x02200000
+python3 -m airspace --backend metal --transport usb --usb-location 0x02200000
 ```
 
 The location above is an example, not a universal device identifier. See the [USB implementation and hardware validation notes](receiver/usb/README.md) for initialization, permissions, diagnostics, and recovery limits.
@@ -126,7 +126,7 @@ The direct USB path batches Ethernet frames to reduce per-transfer work. Current
 
 A recorded M3 Pro / RTL8157 test at 160 Msps IQ8 ran for approximately **95 seconds of actual streaming**, decoded **10,431 CRC-valid packets**, and reported **zero sample loss** in the receiver and decoder. This is a measured run, not a guarantee of indefinite lossless reception.
 
-The benchmark series also includes smaller aggregates, alternative coalescing settings, CPU measurements, startup gaps, and a rejected configuration that dropped samples. It does **not** establish a reduction in total system CPU usage. Read the [raw aggregation results](receiver/usb/aggregation-results.json) and [hardware initialization results](receiver/usb/initialization-results.json) to see the conditions and limitations.
+The benchmark series also includes smaller aggregates, alternative coalescing settings, CPU measurements, startup gaps, and a rejected configuration that dropped samples. It does **not** establish a reduction in total system CPU usage. Read the [raw aggregation results](docs/benchmarks/usb-aggregation.json) and [hardware initialization results](docs/benchmarks/usb-initialization.json) to see the conditions and limitations.
 
 ## Project status
 
@@ -147,7 +147,7 @@ Replay a local recording and open the same viewer:
 ```sh
 ./build/w1700k-ble-wide --file /path/capture.raw --iq8 \
   --demod streaming --backend metal --decode-threads 4 > /tmp/events.jsonl
-python3 server.py --events /tmp/events.jsonl
+python3 -m airspace --events /tmp/events.jsonl
 ```
 
 For file replay, `--iq8` and `--iq4` simulate quantization of native 32-bit radio words; they do not read packed network bytes. `--raw14` reads those words without quantization. With none of those flags, input is interleaved int16 IQ. Recordings are not included.
@@ -159,7 +159,9 @@ Run the regression suites:
 ./tools/run make -C receiver usb-helper check-usb check-usb-init  # macOS USB path
 ```
 
-Build outputs and local compiler profiles are ignored by Git. A regular build requires no profile; `make PROFILE=` explicitly disables one. The historical [research notes](docs/research/README.md) preserve experiments and measurements; old paths there are provenance, not current launch instructions. `browser/` is an incomplete WASM experiment, separate from the supported viewer.
+Build outputs and local compiler profiles are ignored by Git. A regular build requires no profile; `make PROFILE=` explicitly disables one. The historical [research notes](docs/research/README.md) preserve experiments and measurements; old paths there are provenance, not current launch instructions. `experiments/browser/` is an incomplete WASM experiment, separate from the supported viewer.
+
+The [contributor guide](CONTRIBUTING.md) describes the project layout and focused test commands. The small root `server.py` and `live_receiver.py` files preserve compatibility with existing router launchers; application code lives in `airspace/`.
 
 Useful starting points:
 
@@ -167,8 +169,8 @@ Useful starting points:
 | --- | --- |
 | Sample ingestion and stream service | [`receiver/`](receiver/README.md) |
 | RTL8157 capture, initialization, and benchmarks | [`receiver/usb/`](receiver/usb/README.md) |
-| Channelization and streaming demodulation | [`channelizer.metal`](channelizer.metal), [`streaming-demod.h`](streaming-demod.h) |
-| Session lifecycle and connection tracking | [`live_receiver.py`](live_receiver.py), [`connections.py`](connections.py) |
+| Channelization and streaming demodulation | [`src/channelizer/`](src/channelizer/), [`src/decoder/`](src/decoder/) |
+| Session lifecycle and connection tracking | [`airspace/live_receiver.py`](airspace/live_receiver.py), [`airspace/connections.py`](airspace/connections.py) |
 | Viewer and browser-side packet interpretation | [`web/`](web/) |
 
 For bug reports, include the transport, adapter revision, sample format, reproduction steps, and relevant counters. Shutdown diagnostics are retained in `build/live-receiver/`. Keep credentials and private captures out of reports. Performance contributions are most useful with repeatable inputs and both decoding-quality and throughput measurements.

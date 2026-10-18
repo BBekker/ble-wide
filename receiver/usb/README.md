@@ -4,7 +4,7 @@ This path replaces the Realtek Ethernet driver during capture. It bypasses macOS
 
 ## Automatic viewer reception
 
-Run `python3 server.py --backend metal` with the router already exporting. The default `--transport auto` performs read-only IORegistry discovery and matches the tested USB VID/PID/revision (`0bda:8157`, `0x3000`) and network interface owning `--bind`. The link may be inactive: the helper can now initialize it. It never automatically captures an unrelated adapter just because its chipset matches. Unsupported or ambiguous hardware uses UDP. When no stock-driver interface exists, explicitly select the device with `--transport usb --usb-location 0x02200000` (substitute its actual IORegistry location ID). The destination IP still filters exported packets; it need not be assigned to a macOS interface during direct USB capture.
+Run `python3 -m airspace --backend metal` with the router already exporting. The default `--transport auto` performs read-only IORegistry discovery and matches the tested USB VID/PID/revision (`0bda:8157`, `0x3000`) and network interface owning `--bind`. The link may be inactive: the helper can now initialize it. It never automatically captures an unrelated adapter just because its chipset matches. Unsupported or ambiguous hardware uses UDP. When no stock-driver interface exists, explicitly select the device with `--transport usb --usb-location 0x02200000` (substitute its actual IORegistry location ID). The destination IP still filters exported packets; it need not be assigned to a macOS interface during direct USB capture.
 
 The viewer builds and stages the helper, starts its unprivileged sample receiver and decoder, then requests one macOS administrator authorization for the fixed USB executable. Approval is attempted once per viewer run. Declining, failing to receive IQ samples, or losing USB capture releases the adapter and falls back to UDP. `--transport udp` disables takeover; `--transport usb` reports failures without fallback. `--stream /name` attaches to an external receiver and does not auto-select hardware.
 
@@ -75,7 +75,7 @@ Start the development session once:
 
 Only `start` opens an authentication dialog. Later `run` commands reuse the session. The receiver must create the ring before the receive test; `--uid` is supplied by the authenticated session. `status` reports whether it is ready.
 
-`test-session.py` is a temporary root test runner, staged with the helper in a private temporary directory. It only executes that staged helper, accepts commands from the launching user's UID over a private Unix socket, bounds each test to 120 seconds, and expires after two hours. This intentionally trusts the developer's rebuilt helper for the duration of the session. It does not install a service or change sudoers. `session-client.py` submits tests to an existing session and **never initiates another authentication dialog**. Shut the session down with its `--stop` option when done.
+`tools/usb/test-session.py` is a temporary root test runner, staged with the helper in a private temporary directory. It only executes that staged helper, accepts commands from the launching user's UID over a private Unix socket, bounds each test to 120 seconds, and expires after two hours. This intentionally trusts the developer's rebuilt helper for the duration of the session. It does not install a service or change sudoers. `tools/usb/session-client.py` submits tests to an existing session and **never initiates another authentication dialog**. Shut the session down with its `--stop` option when done.
 
 Keep executable staging and ring files outside macOS's protected Documents directory. The initial Python test runner in Documents was denied by TCC even as root; the temporary-directory runner does not need access to those documents.
 
@@ -93,7 +93,7 @@ The data and calibration tables are reproducible from this exact source:
 
 - [Realtek source, pinned mirror commit d93c9f89](https://github.com/awesometic/realtek-r8152-dkms/blob/d93c9f89ca5a831c9437e35319c546e48c710f9a/src/r8152.c): `r8157_init`, `r8157_patch_code`, `rtl_ram_code_speed_up`, `r8157_hw_phy_cfg`, `rtl8157_up`, `rtl8152_set_speed`.
 - Whole source SHA-256: `45b18282a0a9cc4ed007cba6bd77ac2fbb16d9015e2b4d95caee90edc0e715ce`.
-- Run `python3 receiver/usb/import-rtl8157.py /path/to/that/r8152.c` to reproduce `rtl8157-data.h`. The importer rejects another source revision and records individual payload hashes. No firmware downloads occur at build or runtime.
+- Run `python3 tools/usb/import-rtl8157.py /path/to/that/r8152.c` to reproduce `rtl8157-data.h`. The importer rejects another source revision and records individual payload hashes. No firmware downloads occur at build or runtime.
 - [Upstream Linux cross-check](https://github.com/torvalds/linux/blob/32c52ec87d6245ee2d12ed5dd509e40062939b50/drivers/net/usb/r8152.c). That revision implements the corresponding PHY initialization and `rtl8157-1.fw` loader. The firmware file was absent from the linux-firmware tree checked during this work; the bundled bytes come from Realtek's source above.
 
 Within the single-authentication development session:
@@ -109,7 +109,7 @@ The second test deliberately powers down the PHY and confirms link-down before i
 
 ### Initialization hardware results
 
-See [machine-readable measurements](initialization-results.json). All tests shared one authenticated temporary session, which was stopped afterward. The ordinary driver, 5 Gb/s link and MTU 9000 were restored, and the temporary router ARP entry was removed.
+See [machine-readable measurements](../../docs/benchmarks/usb-initialization.json). All tests shared one authenticated temporary session, which was stopped afterward. The ordinary driver, 5 Gb/s link and MTU 9000 were restored, and the temporary router ARP entry was removed.
 
 - The first forced initialization uploaded 9,888 bytes of PHY firmware from reported version `0x0000` to `0x0014`, verified the version readback, and negotiated 5 Gb/s. USB v3 and PLA v1 patches were already installed and therefore skipped; their upload paths have simulated coverage only.
 - A powered-down PHY recovered its 5 Gb/s link. With a permanent destination ARP entry, the following 30-second capture decoded 3,202 CRC-valid and 833 CRC-failed BLE records. It had 976 missing 2,048-sample slices at startup (about 12.5 ms), with no later increase in the receiver's loss counter.
@@ -163,7 +163,7 @@ The final configuration passed a 110-second capture with about 95 seconds of act
 
 Normalized by USB bytes received, helper CPU improved from **0.538 to 0.402 CPU-seconds/GB** (25%), and receiver CPU from **0.328 to 0.261 CPU-seconds/GB** (20%). Receiver context switches per GB fell about 47%. The slower empty-ring polling adds up to approximately 400 µs of requested sleep compared with the previous polling interval; operating-system scheduling can add latency. Steady whole-machine system CPU was **4.72%**, versus **4.66%** for the long 64 KiB baseline: effectively comparable in these sequential desktop runs, not evidence of an overall system CPU reduction. BLE traffic and desktop activity varied between runs.
 
-[Full measurements](aggregation-results.json) retain all ten runs, including rejected settings, startup loss, CPU accounting, decoder counters, and the separate 30-second host-CPU windows. The final defaults have short hardware validation, not a guarantee of indefinite losslessness. Parser and real-receiver tests cover batches above 64 KiB, full-capacity slots, backpressure, wraparound, and bit-exact IQ8/packed-14 output. The next unimplemented optimization is event-driven ring notification in place of polling; sharing DMA buffers could also eliminate the helper-to-ring copy.
+[Full measurements](../../docs/benchmarks/usb-aggregation.json) retain all ten runs, including rejected settings, startup loss, CPU accounting, decoder counters, and the separate 30-second host-CPU windows. The final defaults have short hardware validation, not a guarantee of indefinite losslessness. Parser and real-receiver tests cover batches above 64 KiB, full-capacity slots, backpressure, wraparound, and bit-exact IQ8/packed-14 output. The next unimplemented optimization is event-driven ring notification in place of polling; sharing DMA buffers could also eliminate the helper-to-ring copy.
 
 ## Sources and licensing
 

@@ -2,11 +2,11 @@
 # w1700k-stream: a C++17 compiler and FFTW3 (single precision). Tune for the build host with
 # CXXFLAGS="-O3 -march=native".
 CXX ?= c++
-include ../include/build.mk
+include ../mk/platform.mk
 CXXFLAGS ?= -O3
 WARNINGS ?= -Wall -Wextra -Werror
 PREFIX ?= /usr/local
-override CXXFLAGS += -std=c++17 -pthread -I../include $(FFTW_CFLAGS) $(WARNINGS)
+override CXXFLAGS += -std=c++17 -pthread -I../include -Iusb $(FFTW_CFLAGS) $(WARNINGS)
 LDLIBS += -pthread $(FFTW_LIBS) $(RT_LIBS)
 
 SOURCES := $(wildcard src/*.cpp)
@@ -30,14 +30,15 @@ install: build/w1700k-stream
 	install -m 644 ../include/w1700k_stream.h $(DESTDIR)$(PREFIX)/include/w1700k_stream.h
 
 clean:
-	rm -rf build
+	rm -f build/*.o build/w1700k-stream build/test-usb build/test-init
+	rm -rf build/BLEUSBHelper.app
 
 .PHONY: check-usb check-usb-init usb-helper
-build/test-init: usb/test-init.cpp usb/rtl8157-init.h usb/rtl8157-data.h | build
+build/test-init: ../tests/cpp/usb/test-init.cpp usb/rtl8157-init.h usb/rtl8157-data.h | build
 	$(CXX) $(CXXFLAGS) $< -o $@
 check-usb-init: build/test-init
 	./build/test-init
-build/test-usb: usb/test-usb.cpp usb/frames.h usb/ring.h | build
+build/test-usb: ../tests/cpp/usb/test-usb.cpp usb/frames.h usb/ring.h | build
 	$(CXX) $(CXXFLAGS) $< -o $@
 check-usb: build/test-usb
 	./build/test-usb

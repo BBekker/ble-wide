@@ -7,10 +7,10 @@ The extraction includes local development beyond that commit.
 The MIT notice in LICENSE is retained for inherited source.
 include/iq4.h, include/iq8.h and include/w1700k_stream.h are vendored
 format/shared-memory interfaces from that working tree; no router checkout
-is needed to build. advertisements.py derives from host/ble/server.py.
-The test bit sequence is identified in tests/fixtures.py.
+is needed to build. airspace/advertisements.py derives from host/ble/server.py.
+The test bit sequence is identified in tests/python/fixtures.py.
 
-The receiver/ UDP ingest service and include/{fft.h,posix.h,build.mk} also
+The receiver/ UDP ingest service and include/{fft.h,posix.h} and mk/platform.mk also
 come from host/stream and host/common in that working tree.
 include/uapi/w1700k_sdr.h retains GPL-2.0 WITH Linux-syscall-note; it is
 a Linux userspace interface, not firmware. Its SPDX license applies to that file.
@@ -27,6 +27,6 @@ receiver/usb/rtl8157-init.h and rtl8157-data.h port initialization and
 firmware/register tables from Realtek r8152 v2.22.1, Copyright (c) 2024
 Realtek Semiconductor Corp. All rights reserved., under GPL-2.0-only.
 Pinned source: https://github.com/awesometic/realtek-r8152-dkms/blob/d93c9f89ca5a831c9437e35319c546e48c710f9a/src/r8152.c
-receiver/usb/import-rtl8157.py reproduces the tables from that source and
+tools/usb/import-rtl8157.py reproduces the tables from that source and
 verifies its SHA-256 before importing. These files are compiled into the
 separate GPL-2.0-only helper; see LICENSES/GPL-2.0.

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // Copyright (c) 2024 Realtek Semiconductor Corp. All rights reserved.
-// Port of Realtek r8152 v2.22.1 RTL_VER_16 initialization; see import-rtl8157.py.
+// Port of Realtek r8152 v2.22.1 RTL_VER_16 initialization; see tools/usb/import-rtl8157.py.
 // IO supplies checked field/write/block operations and cancellable millisecond sleep.
 // No EEPROM/flash programming: all firmware below is loaded into volatile RAM.
 #pragma once
