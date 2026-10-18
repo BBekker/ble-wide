@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+"""Start one authenticated, temporary USB test session; run later tests without prompts."""
+import argparse
+import json
+import os
+from pathlib import Path
+import shlex
+import shutil
+import signal
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+
+ROOT=Path(__file__).resolve().parents[1]
+STATE=ROOT/'receiver/build/usb-research/session.json'
+
+def main():
+    p=argparse.ArgumentParser(description=__doc__)
+    p.add_argument('action',choices=['start','status','run','stop'])
+    p.add_argument('arguments',nargs=argparse.REMAINDER)
+    a=p.parse_args()
+    if sys.platform!='darwin':p.error('USB helper requires macOS')
+    state=json.loads(STATE.read_text()) if STATE.exists() else None
+    ready=bool(state and Path(state['socket']).exists())
+    if a.action=='status':
+        print('ready' if ready else 'authentication pending or session stopped' if state else 'not started');return
+    if a.action=='start':
+        if state:
+            p.error('a session record already exists; use status/run, or stop before starting another')
+        subprocess.run([str(ROOT/'tools/run'),'make','-C','receiver','usb-helper'],check=True)
+        stage=Path(tempfile.mkdtemp(prefix='ble-usb-',dir='/tmp'))
+        shutil.copy2(ROOT/'receiver/usb/test-session.py',stage/'test-session.py')
+        shutil.copytree(ROOT/'receiver/build/BLEUSBHelper.app',stage/'BLEUSBHelper.app')
+        path=stage/'control.sock'
+        cmd=shlex.join([sys.executable,'-I',str(stage/'test-session.py'),'--socket',str(path),'--uid',str(os.getuid())])
+        auth=stage/'authenticate.applescript'
+        auth.write_text('with timeout of 7500 seconds\n do shell script '+json.dumps(cmd)+' with administrator privileges\nend timeout\n')
+        STATE.parent.mkdir(parents=True,exist_ok=True)
+        log=(STATE.parent/'session.log').open('w')
+        child=subprocess.Popen(['osascript',str(auth)],stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+        STATE.write_text(json.dumps({'socket':str(path),'uid':os.getuid(),'launcher_pid':child.pid,'auth_script':str(auth)}))
+        print('One macOS authentication dialog opens for this temporary session.',flush=True)
+        while child.poll() is None and not path.exists():time.sleep(.25)
+        if not path.exists():raise SystemExit('Session failed; see receiver/build/usb-research/session.log')
+        print('Ready. Later tools/usb-session run calls do not prompt. Finish with tools/usb-session stop.');return
+    if not state:p.error('no session')
+    if a.action=='run':
+        # Forward timeout/log flags and the helper argument separator unchanged.
+        raise SystemExit(subprocess.call([sys.executable,str(ROOT/'receiver/usb/session-client.py'),*a.arguments]))
+    if ready:
+        subprocess.run([sys.executable,str(ROOT/'receiver/usb/session-client.py'),'--stop'],check=True)
+    elif state.get('launcher_pid'):
+        pid=state['launcher_pid']
+        command=subprocess.run(['ps','-p',str(pid),'-o','command='],capture_output=True,text=True).stdout
+        if state.get('auth_script') and state['auth_script'] in command:os.kill(pid,signal.SIGTERM)
+    else:
+        p.error('session has no recorded launcher PID; cancel its pending macOS dialog before removing the session record')
+    stage=Path(state['socket']).parent
+    if stage.parent==Path('/tmp') and stage.name.startswith('ble-usb-'):
+        shutil.rmtree(stage)
+    STATE.unlink(missing_ok=True)
+    print('Temporary USB test session stopped.')
+
+if __name__=='__main__':main()

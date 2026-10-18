@@ -76,7 +76,8 @@ public:
         uint64_t run = 0, newest = 0;
     };
 
-    Ingest(SampleRing &ring, const std::string &bind_ip, unsigned port, unsigned threads, unsigned ports = 1);
+    Ingest(SampleRing &ring, const std::string &bind_ip, unsigned port, unsigned threads,
+           unsigned ports = 1, const std::string &usb_ring = "");
     ~Ingest();
     Ingest(const Ingest &) = delete;
     Ingest &operator=(const Ingest &) = delete;
@@ -92,6 +93,7 @@ private:
     struct Worker;
     void work(Worker &w);
     void work_device(Worker &w);
+    void work_usb(Worker &w);
     void take(Worker &w, const uint8_t *data, size_t n, bool fresh, uint64_t t);
     void take_record(Worker &w, const uint8_t *data, size_t n, uint64_t t);
     void check(Worker &w, uint64_t run, uint64_t index);
@@ -99,6 +101,7 @@ private:
     SampleRing &ring_;
     const std::string bind_ip_;
     const unsigned port_, threads_, ports_;
+    const std::string usb_ring_;
     std::atomic<bool> stopping_{false};
     std::vector<std::unique_ptr<Worker>> workers_;
 #ifdef __linux__

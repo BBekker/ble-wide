@@ -29,6 +29,7 @@ void usage()
                  "usage: w1700k-stream [options]\n"
                  "  --bind IP         the stream's destination address on this host (default 10.77.0.10)\n"
                  "  --device PATH     read the router's SDR DMA ring directly (Linux only)\n"
+                 "  --usb-ring PATH   receive RTL8157 USB transfers from the separate privileged helper\n"
                  "  --receive-mib N   input ring size, a power of two (default 256)\n"
                  "  --port N          its UDP port (default 7700)\n"
                  "  --ports N         consecutive UDP ports, one receiver per port (default 1)\n"
@@ -60,7 +61,7 @@ int main(int argc, char **argv)
 #ifdef __APPLE__
     pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0);
 #endif
-    std::string bind = "10.77.0.10", name = W1700K_STREAM_NAME;
+    std::string bind = "10.77.0.10", name = W1700K_STREAM_NAME, usb_ring;
     unsigned ports = 1, port = 7700, rx_threads = 8, workers = 6, ring_mib = 512, receive_mib = 256, report = 0;
     try {
         for (int i = 1; i < argc; ++i) {
@@ -70,6 +71,7 @@ int main(int argc, char **argv)
                 return argv[++i];
             };
             if (arg == "--bind") bind = value();
+            else if (arg == "--usb-ring") usb_ring = value();
             else if (arg == "--device") {
                 bind = value();
                 if (bind.rfind("/dev/", 0) != 0) throw std::runtime_error("--device needs a /dev/ path");
@@ -102,7 +104,7 @@ int main(int argc, char **argv)
     try {
         SharedRing shared(name, ring_mib * 128);
         SampleRing received(receive_mib * 128);
-        Ingest ingest(received, bind, port, rx_threads, ports);
+        Ingest ingest(received, bind, port, rx_threads, ports, usb_ring);
         Publisher publisher(received, ingest, shared.header(), workers);
         publisher.start();
         ingest.start();

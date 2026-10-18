@@ -62,3 +62,5 @@ The shared-memory ABI is in [`include/w1700k_stream.h`](include/w1700k_stream.h)
 Historical [research notes and measurements](docs/research/README.md) retain the paths and observations from their original checkout. They are provenance, not current launch instructions. `browser/` preserves an incomplete browser/WASM experiment and is not part of the supported viewer or default build.
 
 Local recordings and older build experiments may be kept under ignored `local-data/`; none are uploaded. See [`NOTICE`](NOTICE) for source provenance and licensing.
+
+Experimental [direct RTL8157 USB input](receiver/usb/README.md) is available as an optional, separately built helper. The UDP receiver remains the tested default.
