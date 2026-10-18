@@ -1,0 +1,404 @@
+{
+  "date": "2026-10-17",
+  "machine": "Apple M3 Pro, 11 CPU cores",
+  "retained_change": "LLVM profile-guided compilation of the established streaming decoder; no changes to arithmetic, thresholds, noise learning, timing coverage or packet handling",
+  "training_captures": [
+    0,
+    8,
+    16,
+    24
+  ],
+  "training_repeats": 3,
+  "performance_captures": [
+    2,
+    19
+  ],
+  "performance": {
+    "live_receiver_running": false,
+    "repeats_per_run": 40,
+    "trials_per_build_per_capture": 3,
+    "samples_per_run": 671088640,
+    "medians": {
+      "2": {
+        "baseline": {
+          "decode_cpu_s": 3.239591,
+          "filter_cpu_s": 0.105925,
+          "gpu_s": 0.780005,
+          "capacity_msps": 555.04
+        },
+        "final": {
+          "decode_cpu_s": 3.132713,
+          "filter_cpu_s": 0.113729,
+          "gpu_s": 0.728795,
+          "capacity_msps": 569.643
+        }
+      },
+      "19": {
+        "baseline": {
+          "decode_cpu_s": 3.158725,
+          "filter_cpu_s": 0.107323,
+          "gpu_s": 0.763219,
+          "capacity_msps": 569.584
+        },
+        "final": {
+          "decode_cpu_s": 3.064973,
+          "filter_cpu_s": 0.109127,
+          "gpu_s": 0.745094,
+          "capacity_msps": 583.189
+        }
+      }
+    },
+    "runs": [
+      {
+        "version": "baseline",
+        "trial": 0,
+        "capture": 2,
+        "decode_cpu_s": 3.239591,
+        "filter_cpu_s": 0.105925,
+        "gpu_s": 0.780005,
+        "capacity_msps": 555.04
+      },
+      {
+        "version": "final",
+        "trial": 0,
+        "capture": 2,
+        "decode_cpu_s": 3.221145,
+        "filter_cpu_s": 0.118804,
+        "gpu_s": 0.784145,
+        "capacity_msps": 547.963
+      },
+      {
+        "version": "baseline",
+        "trial": 0,
+        "capture": 19,
+        "decode_cpu_s": 3.197312,
+        "filter_cpu_s": 0.112644,
+        "gpu_s": 0.799895,
+        "capacity_msps": 560.87
+      },
+      {
+        "version": "final",
+        "trial": 0,
+        "capture": 19,
+        "decode_cpu_s": 3.064973,
+        "filter_cpu_s": 0.109127,
+        "gpu_s": 0.757068,
+        "capacity_msps": 583.189
+      },
+      {
+        "version": "final",
+        "trial": 1,
+        "capture": 2,
+        "decode_cpu_s": 3.132713,
+        "filter_cpu_s": 0.113729,
+        "gpu_s": 0.723303,
+        "capacity_msps": 569.643
+      },
+      {
+        "version": "baseline",
+        "trial": 1,
+        "capture": 2,
+        "decode_cpu_s": 3.256556,
+        "filter_cpu_s": 0.109888,
+        "gpu_s": 0.783833,
+        "capacity_msps": 551.216
+      },
+      {
+        "version": "final",
+        "trial": 1,
+        "capture": 19,
+        "decode_cpu_s": 3.180369,
+        "filter_cpu_s": 0.121189,
+        "gpu_s": 0.745094,
+        "capacity_msps": 556.231
+      },
+      {
+        "version": "baseline",
+        "trial": 1,
+        "capture": 19,
+        "decode_cpu_s": 3.158725,
+        "filter_cpu_s": 0.107323,
+        "gpu_s": 0.763219,
+        "capacity_msps": 569.584
+      },
+      {
+        "version": "baseline",
+        "trial": 2,
+        "capture": 2,
+        "decode_cpu_s": 3.220013,
+        "filter_cpu_s": 0.103808,
+        "gpu_s": 0.746786,
+        "capacity_msps": 559.882
+      },
+      {
+        "version": "final",
+        "trial": 2,
+        "capture": 2,
+        "decode_cpu_s": 3.118673,
+        "filter_cpu_s": 0.110555,
+        "gpu_s": 0.728795,
+        "capacity_msps": 571.938
+      },
+      {
+        "version": "baseline",
+        "trial": 2,
+        "capture": 19,
+        "decode_cpu_s": 3.154131,
+        "filter_cpu_s": 0.105667,
+        "gpu_s": 0.73211,
+        "capacity_msps": 571.22
+      },
+      {
+        "version": "final",
+        "trial": 2,
+        "capture": 19,
+        "decode_cpu_s": 3.052047,
+        "filter_cpu_s": 0.108596,
+        "gpu_s": 0.73449,
+        "capacity_msps": 585.837
+      }
+    ]
+  },
+  "packet_regression": {
+    "captures": 40,
+    "held_out_from_training": 36,
+    "valid_before": 895,
+    "valid_after": 895,
+    "events_before": 1434,
+    "events_after": 1434,
+    "lost": 0,
+    "added": 0
+  },
+  "connections": [
+    {
+      "dataset": "old",
+      "before": 49,
+      "after": 49,
+      "exact_match": true
+    },
+    {
+      "dataset": "fresh",
+      "before": 64,
+      "after": 64,
+      "exact_match": true
+    }
+  ],
+  "tests": [
+    "tests/test_ble_wide.py (actual profiled executable, CPU/Metal, both layouts, 1/4/40 workers)",
+    "40-capture exact packet comparison including CRC failures",
+    "Two seeded connection datasets with profile-compiled block decoder"
+  ],
+  "discarded_experiments": {
+    "address": "Bit-parallel address validity and combined membership hint: small/inconsistent full-decoder gain; reverted.",
+    "shared-output": "Owned shared GPU output reduced copy work, but slower downstream processing erased the gain; reverted.",
+    "eager": "Vector phase computation for all samples added idle work and increased CPU use.",
+    "local": "Cached synchronization interpolation window: small improvement, not retained.",
+    "compact": "Byte phase-valid flags and outlining candidate insertion: inconsistent gain, not retained.",
+    "rates": "Loading noise learning coefficients from state was slower than compiler constants.",
+    "window": "Sharing noise history saved bookkeeping but did not recover the slower coefficient variant; not retained.",
+    "native": "Native CPU tuning added only a small improvement within live-run variability; not enabled."
+  },
+  "exploratory_live_benchmarks": {
+    "address": {
+      "live_receiver_running": true,
+      "medians": {
+        "before": {
+          "decode_cpu_s": 2.150035,
+          "filter_cpu_s": 0.092662,
+          "gpu_s": 0.470207,
+          "capacity_msps": 376.923
+        },
+        "after": {
+          "decode_cpu_s": 2.141429,
+          "filter_cpu_s": 0.092001,
+          "gpu_s": 0.453279,
+          "capacity_msps": 375.651
+        }
+      }
+    },
+    "shared-output": {
+      "live_receiver_running": true,
+      "medians": {
+        "before": {
+          "decode_cpu_s": 2.229553,
+          "filter_cpu_s": 0.098362,
+          "gpu_s": 0.459599,
+          "capacity_msps": 359.828
+        },
+        "after": {
+          "decode_cpu_s": 2.315586,
+          "filter_cpu_s": 0.061482,
+          "gpu_s": 0.462416,
+          "capacity_msps": 338.857
+        }
+      }
+    },
+    "eager": {
+      "live_receiver_running": true,
+      "medians": {
+        "before": {
+          "decode_cpu_s": 2.193004,
+          "filter_cpu_s": 0.059024,
+          "gpu_s": 0.484585,
+          "capacity_msps": 364.093
+        },
+        "after": {
+          "decode_cpu_s": 2.282666,
+          "filter_cpu_s": 0.06036,
+          "gpu_s": 0.493131,
+          "capacity_msps": 348.136
+        }
+      }
+    },
+    "local": {
+      "live_receiver_running": true,
+      "medians": {
+        "before": {
+          "decode_cpu_s": 2.189643,
+          "filter_cpu_s": 0.056717,
+          "gpu_s": 0.477982,
+          "capacity_msps": 367.91
+        },
+        "after": {
+          "decode_cpu_s": 2.141055,
+          "filter_cpu_s": 0.057093,
+          "gpu_s": 0.480421,
+          "capacity_msps": 372.514
+        }
+      }
+    },
+    "compact": {
+      "live_receiver_running": true,
+      "medians": {
+        "before": {
+          "decode_cpu_s": 2.143474,
+          "filter_cpu_s": 0.055865,
+          "gpu_s": 0.452143,
+          "capacity_msps": 380.882
+        },
+        "after": {
+          "decode_cpu_s": 2.13594,
+          "filter_cpu_s": 0.058163,
+          "gpu_s": 0.457844,
+          "capacity_msps": 372.885
+        }
+      }
+    },
+    "rates": {
+      "live_receiver_running": true,
+      "medians": {
+        "before": {
+          "decode_cpu_s": 2.21962,
+          "filter_cpu_s": 0.099177,
+          "gpu_s": 0.476644,
+          "capacity_msps": 357.721
+        },
+        "after": {
+          "decode_cpu_s": 2.406092,
+          "filter_cpu_s": 0.099482,
+          "gpu_s": 0.475378,
+          "capacity_msps": 337.255
+        }
+      }
+    },
+    "window": {
+      "live_receiver_running": true,
+      "medians": {
+        "before": {
+          "decode_cpu_s": 2.379876,
+          "filter_cpu_s": 0.100865,
+          "gpu_s": 0.474622,
+          "capacity_msps": 340.463
+        },
+        "after": {
+          "decode_cpu_s": 2.341283,
+          "filter_cpu_s": 0.096977,
+          "gpu_s": 0.476579,
+          "capacity_msps": 347.586
+        }
+      }
+    },
+    "pgo": {
+      "live_receiver_running": true,
+      "medians": {
+        "before": {
+          "decode_cpu_s": 2.272332,
+          "filter_cpu_s": 0.104967,
+          "gpu_s": 0.453303,
+          "capacity_msps": 350.618
+        },
+        "after": {
+          "decode_cpu_s": 2.276491,
+          "filter_cpu_s": 0.112777,
+          "gpu_s": 0.452039,
+          "capacity_msps": 341.364
+        }
+      }
+    },
+    "native": {
+      "live_receiver_running": true,
+      "medians": {
+        "before": {
+          "decode_cpu_s": 8.126805,
+          "filter_cpu_s": 0.354796,
+          "gpu_s": 1.790962,
+          "capacity_msps": 389.853
+        },
+        "after": {
+          "decode_cpu_s": 8.030965,
+          "filter_cpu_s": 0.3493,
+          "gpu_s": 1.766511,
+          "capacity_msps": 401.82
+        }
+      }
+    }
+  },
+  "artifacts": "build/tuning (local replays, instrumented builds, profiles and experiment outputs)",
+  "compiler": "Homebrew clang version 23.1.3",
+  "final_binary_sha256": "2a04c6d156fe7e93205508cf2e43ab3557503d9b38fd1fc1f7a7e6ffa3d8a09b",
+  "initial_live_verification": {
+    "interval": {
+      "samples": 4811421696,
+      "packets": 3770,
+      "lost_samples": 1001472,
+      "resets": 489,
+      "elapsed_s": 30.079245,
+      "filter_cpu_s": 1.385519,
+      "decode_cpu_s": 29.660555,
+      "gpu_s": 6.2437260000000006
+    },
+    "final": {
+      "source_alive": true,
+      "demodulator": "streaming",
+      "backend": "metal",
+      "decode_threads": 4,
+      "lag_ms": 0.0,
+      "capacity_msps": 389.742
+    }
+  },
+  "live_verification": {
+    "interval": {
+      "samples": 4849647616,
+      "packets": 3780,
+      "lost_samples": 0,
+      "resets": 0,
+      "elapsed_s": 30.301580999999985,
+      "filter_cpu_s": 1.373682,
+      "decode_cpu_s": 29.099420999999992,
+      "gpu_s": 6.884073999999998
+    },
+    "final": {
+      "source_alive": true,
+      "demodulator": "streaming",
+      "backend": "metal",
+      "decode_threads": 4,
+      "lag_ms": 0.0,
+      "capacity_msps": 379.22
+    }
+  },
+  "initial_input_gaps": {
+    "lost_blocks": 489,
+    "lost_samples": 1001472,
+    "evidence": "The unchanged w1700k-stream input receiver marked exactly 489 lost slices, matching the decoder loss count. Its overrun/socket-drop/late counters were zero. Lost count then remained at 489; subsequent 30.3-second decoder check recorded zero additional losses or resets and zero backlog. Underlying transport/capture cause was not established."
+  }
+}

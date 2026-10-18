@@ -1,0 +1,401 @@
+{
+  "date": "2026-10-17",
+  "machine": "Apple M3 Pro, 11 CPU cores",
+  "retained_changes": [
+    "Keep all synchronization timing accumulators in five NEON vector pairs, loading each observation and weight once.",
+    "Interpolate and compare four synchronized address bits per NEON vector, retaining float interpolation, double thresholds and strict greater-than decisions.",
+    "Update the independent background and adaptive-floor recurrences together in a two-lane double vector, preserving each sample and each FMA.",
+    "Reduce the 64-sample display-noise window with NEON when a packet is acquired instead of maintaining its sum on every sample."
+  ],
+  "unchanged": "Raw preamble search, lazy phase discrimination, timing-hypothesis coverage, packet thresholds, packet-noise exclusions, single payload decode, channelizer and four-worker default.",
+  "comparison": {
+    "baseline": "Previously deployed profile-guided receiver (frozen build/search-vector/before)",
+    "candidate": "New profile-guided receiver (build/search-vector/final)",
+    "backend": "metal",
+    "decoder": "streaming",
+    "workers": 4,
+    "format": "iq8",
+    "live_capture_paused": true,
+    "trials": 3,
+    "repeat": 40,
+    "samples_per_run": 671088640,
+    "training_captures": [
+      0,
+      8,
+      16,
+      24
+    ],
+    "held_out_captures": [
+      2,
+      7,
+      19,
+      27
+    ],
+    "medians": {
+      "2": {
+        "baseline": {
+          "decode_cpu_s": 3.10037,
+          "filter_cpu_s": 0.10348,
+          "gpu_s": 0.757186,
+          "capacity_msps": 578.282
+        },
+        "final": {
+          "decode_cpu_s": 2.632916,
+          "filter_cpu_s": 0.100838,
+          "gpu_s": 0.747857,
+          "capacity_msps": 664.663
+        },
+        "decoder_cpu_reduction_percent": 15.07736173424462,
+        "capacity_increase_percent": 14.937521831908995
+      },
+      "7": {
+        "baseline": {
+          "decode_cpu_s": 2.900985,
+          "filter_cpu_s": 0.101868,
+          "gpu_s": 0.761412,
+          "capacity_msps": 616.561
+        },
+        "final": {
+          "decode_cpu_s": 2.538422,
+          "filter_cpu_s": 0.100749,
+          "gpu_s": 0.740983,
+          "capacity_msps": 686.71
+        },
+        "decoder_cpu_reduction_percent": 12.497927428097688,
+        "capacity_increase_percent": 11.377463057183302
+      },
+      "19": {
+        "baseline": {
+          "decode_cpu_s": 3.025227,
+          "filter_cpu_s": 0.10157,
+          "gpu_s": 0.752541,
+          "capacity_msps": 595.057
+        },
+        "final": {
+          "decode_cpu_s": 2.582766,
+          "filter_cpu_s": 0.100951,
+          "gpu_s": 0.747148,
+          "capacity_msps": 678.979
+        },
+        "decoder_cpu_reduction_percent": 14.625712384558254,
+        "capacity_increase_percent": 14.1031867535379
+      },
+      "27": {
+        "baseline": {
+          "decode_cpu_s": 3.108148,
+          "filter_cpu_s": 0.102076,
+          "gpu_s": 0.765419,
+          "capacity_msps": 580.922
+        },
+        "final": {
+          "decode_cpu_s": 2.70497,
+          "filter_cpu_s": 0.101259,
+          "gpu_s": 0.73317,
+          "capacity_msps": 651.355
+        },
+        "decoder_cpu_reduction_percent": 12.971647424768706,
+        "capacity_increase_percent": 12.12434715848254
+      }
+    },
+    "runs": [
+      {
+        "version": "baseline",
+        "trial": 0,
+        "capture": 2,
+        "decode_cpu_s": 3.10037,
+        "filter_cpu_s": 0.10348,
+        "gpu_s": 0.757186,
+        "capacity_msps": 578.282
+      },
+      {
+        "version": "final",
+        "trial": 0,
+        "capture": 2,
+        "decode_cpu_s": 2.644509,
+        "filter_cpu_s": 0.100838,
+        "gpu_s": 0.721858,
+        "capacity_msps": 664.451
+      },
+      {
+        "version": "baseline",
+        "trial": 0,
+        "capture": 7,
+        "decode_cpu_s": 2.90436,
+        "filter_cpu_s": 0.101868,
+        "gpu_s": 0.752771,
+        "capacity_msps": 614.201
+      },
+      {
+        "version": "final",
+        "trial": 0,
+        "capture": 7,
+        "decode_cpu_s": 2.544684,
+        "filter_cpu_s": 0.100749,
+        "gpu_s": 0.740983,
+        "capacity_msps": 686.71
+      },
+      {
+        "version": "baseline",
+        "trial": 0,
+        "capture": 19,
+        "decode_cpu_s": 3.025227,
+        "filter_cpu_s": 0.101253,
+        "gpu_s": 0.752541,
+        "capacity_msps": 595.057
+      },
+      {
+        "version": "final",
+        "trial": 0,
+        "capture": 19,
+        "decode_cpu_s": 2.647563,
+        "filter_cpu_s": 0.104188,
+        "gpu_s": 0.742505,
+        "capacity_msps": 656.27
+      },
+      {
+        "version": "baseline",
+        "trial": 0,
+        "capture": 27,
+        "decode_cpu_s": 3.108148,
+        "filter_cpu_s": 0.102076,
+        "gpu_s": 0.74114,
+        "capacity_msps": 580.922
+      },
+      {
+        "version": "final",
+        "trial": 0,
+        "capture": 27,
+        "decode_cpu_s": 2.668583,
+        "filter_cpu_s": 0.09885,
+        "gpu_s": 0.711851,
+        "capacity_msps": 660.924
+      },
+      {
+        "version": "final",
+        "trial": 1,
+        "capture": 2,
+        "decode_cpu_s": 2.631579,
+        "filter_cpu_s": 0.10066,
+        "gpu_s": 0.747857,
+        "capacity_msps": 665.255
+      },
+      {
+        "version": "baseline",
+        "trial": 1,
+        "capture": 2,
+        "decode_cpu_s": 3.081257,
+        "filter_cpu_s": 0.100311,
+        "gpu_s": 0.751977,
+        "capacity_msps": 584.458
+      },
+      {
+        "version": "final",
+        "trial": 1,
+        "capture": 7,
+        "decode_cpu_s": 2.538422,
+        "filter_cpu_s": 0.102008,
+        "gpu_s": 0.7398,
+        "capacity_msps": 686.149
+      },
+      {
+        "version": "baseline",
+        "trial": 1,
+        "capture": 7,
+        "decode_cpu_s": 2.894802,
+        "filter_cpu_s": 0.101182,
+        "gpu_s": 0.761412,
+        "capacity_msps": 616.569
+      },
+      {
+        "version": "final",
+        "trial": 1,
+        "capture": 19,
+        "decode_cpu_s": 2.582766,
+        "filter_cpu_s": 0.100951,
+        "gpu_s": 0.747148,
+        "capacity_msps": 678.979
+      },
+      {
+        "version": "baseline",
+        "trial": 1,
+        "capture": 19,
+        "decode_cpu_s": 3.019398,
+        "filter_cpu_s": 0.10157,
+        "gpu_s": 0.740378,
+        "capacity_msps": 595.749
+      },
+      {
+        "version": "final",
+        "trial": 1,
+        "capture": 27,
+        "decode_cpu_s": 2.79303,
+        "filter_cpu_s": 0.111215,
+        "gpu_s": 0.756715,
+        "capacity_msps": 625.163
+      },
+      {
+        "version": "baseline",
+        "trial": 1,
+        "capture": 27,
+        "decode_cpu_s": 3.167553,
+        "filter_cpu_s": 0.112709,
+        "gpu_s": 0.794141,
+        "capacity_msps": 565.37
+      },
+      {
+        "version": "baseline",
+        "trial": 2,
+        "capture": 2,
+        "decode_cpu_s": 3.103416,
+        "filter_cpu_s": 0.103588,
+        "gpu_s": 0.767769,
+        "capacity_msps": 577.183
+      },
+      {
+        "version": "final",
+        "trial": 2,
+        "capture": 2,
+        "decode_cpu_s": 2.632916,
+        "filter_cpu_s": 0.102082,
+        "gpu_s": 0.751712,
+        "capacity_msps": 664.663
+      },
+      {
+        "version": "baseline",
+        "trial": 2,
+        "capture": 7,
+        "decode_cpu_s": 2.900985,
+        "filter_cpu_s": 0.102283,
+        "gpu_s": 0.765086,
+        "capacity_msps": 616.561
+      },
+      {
+        "version": "final",
+        "trial": 2,
+        "capture": 7,
+        "decode_cpu_s": 2.534472,
+        "filter_cpu_s": 0.099456,
+        "gpu_s": 0.764596,
+        "capacity_msps": 687.069
+      },
+      {
+        "version": "baseline",
+        "trial": 2,
+        "capture": 19,
+        "decode_cpu_s": 3.026529,
+        "filter_cpu_s": 0.102368,
+        "gpu_s": 0.767592,
+        "capacity_msps": 594.267
+      },
+      {
+        "version": "final",
+        "trial": 2,
+        "capture": 19,
+        "decode_cpu_s": 2.582271,
+        "filter_cpu_s": 0.099966,
+        "gpu_s": 0.774564,
+        "capacity_msps": 679.821
+      },
+      {
+        "version": "baseline",
+        "trial": 2,
+        "capture": 27,
+        "decode_cpu_s": 3.098981,
+        "filter_cpu_s": 0.100785,
+        "gpu_s": 0.765419,
+        "capacity_msps": 582.685
+      },
+      {
+        "version": "final",
+        "trial": 2,
+        "capture": 27,
+        "decode_cpu_s": 2.70497,
+        "filter_cpu_s": 0.101259,
+        "gpu_s": 0.73317,
+        "capacity_msps": 651.355
+      }
+    ]
+  },
+  "validation": {
+    "recordings": 40,
+    "recordings_not_used_for_training": 36,
+    "valid_packets": 895,
+    "crc_failed_packets": 539,
+    "lost_packet_records": 0,
+    "added_packet_records": 0,
+    "saved_connections": {
+      "old": 49,
+      "fresh": 64,
+      "all_records_equal": true
+    },
+    "measurements": {
+      "max_printed_difference": {
+        "signal_dbfs": 0.0,
+        "frequency_offset_hz": 0.0,
+        "noise_dbfs": 0.0
+      },
+      "missing_measurement_changes": 0
+    },
+    "tests": [
+      "check-streaming-vector: 90000 SIMD/scalar address comparisons including exact-threshold ties; differential arithmetic, blocks, strides and resets",
+      "check-packet-noise: exact learned-filter reference; exclusions; vector display-window reduction against long-double sums",
+      "check-streaming, check-sensitivity, check-reply-sync, check-decode-pool, near/far cases",
+      "tests/test_ble_wide.py: all 40 channels, IQ4/IQ8/raw14, CPU/Metal, planar/interleaved, 1/4/40 workers",
+      "AddressSanitizer and UndefinedBehaviorSanitizer streaming-vector tests"
+    ]
+  },
+  "live_verification": {
+    "interval": {
+      "samples": 4804837376,
+      "packets": 5320,
+      "lost_samples": 0,
+      "resets": 0,
+      "elapsed_s": 30.028593,
+      "filter_cpu_s": 0.973622,
+      "decode_cpu_s": 23.134777,
+      "gpu_s": 5.713332999999999
+    },
+    "final": {
+      "source_alive": true,
+      "demodulator": "streaming",
+      "backend": "metal",
+      "decode_threads": 4,
+      "lag_ms": 0.0,
+      "capacity_msps": 508.669,
+      "lost_samples": 0,
+      "resets": 1
+    }
+  },
+  "discarded_experiments": [
+    {
+      "change": "Larger prepared history and lazy four-angle groups",
+      "result": "Matched synthetic packet/measurement tests but about 9% more decoder CPU in preliminary replays."
+    },
+    {
+      "change": "Batched raw address windows and vector candidate masks",
+      "result": "Matched synthetic tests but about 15% more decoder CPU in the isolated comparison."
+    },
+    {
+      "change": "Precomputed and vectorized payload branch metrics",
+      "result": "No measurable incremental improvement on the raw-screening variant; excluded."
+    },
+    {
+      "change": "Earlier full preamble convolution batches",
+      "result": "Faster isolated convolution kernel, no demonstrated full-decoder improvement; remains excluded."
+    }
+  ],
+  "artifacts": {
+    "raw_experiments": "build/search-vector/",
+    "profile_training_metadata": "build/decoder-profile.json",
+    "source_files": [
+      "streaming-demod.h",
+      "streaming-vector.h",
+      "packet-noise.h"
+    ],
+    "source_sha256": {
+      "streaming-demod.h": "a23b8d0c8604234079f374018eda1f962b841971a58fffb4e7b730b2ad4df0c8",
+      "streaming-vector.h": "33ab67cd4d1f7d0894c4b707aa8b7aee8ff864da9931ce7db18a452dbf979837",
+      "packet-noise.h": "618352de1aa750a11f5bff58f3416082b9186583597d30ac537eaa1a60db60c8"
+    }
+  }
+}

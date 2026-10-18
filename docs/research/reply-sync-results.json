@@ -1,0 +1,58 @@
+{
+  "change": "CRC-valid data packets arm a bounded LE 1M reply synchronization hint; exact access-address lookup before neighbor correction prevents low-bit membership collisions from bypassing correction. One payload decoder; no CRC-directed replay.",
+  "binary_sha256": "74216035402866a570eda9fd5ecd23abdf3f3cb9fb82b10acbefab88b98e963a",
+  "captured_connection": {
+    "capture_directory": "/Users/bernardbekker/Documents/router-sdr/host/ble-wide/build/live-reply-capture/20261017-142931",
+    "complex_sample_rate": 160000000,
+    "seconds": 2.097152,
+    "bad_slices": 0,
+    "central_packets_with_reply_window": 38,
+    "replies_before": 5,
+    "replies_after": 9,
+    "all_packets_before": 43,
+    "all_packets_after": 47,
+    "missed": 0
+  },
+  "older_recordings": {
+    "count": 40,
+    "before": 893,
+    "after": 894,
+    "missed": 0
+  },
+  "benchmark_medians": {
+    "before": {
+      "decode_cpu_s": 2.572501,
+      "decode_wall_s": 1.047155,
+      "capacity_msps": 252.584
+    },
+    "after": {
+      "decode_cpu_s": 2.748604,
+      "decode_wall_s": 1.126754,
+      "capacity_msps": 241.768
+    }
+  },
+  "decoder_cpu_change_percent": 6.8455950065714255,
+  "validation": [
+    "check-streaming",
+    "check-packet-noise",
+    "check-decode-pool",
+    "check-reply-sync",
+    "test-reply-sync with AddressSanitizer and UndefinedBehaviorSanitizer"
+  ],
+  "limitations": [
+    "Most expected replies in the real recording remain undecoded; packet presence cannot be inferred from timing alone.",
+    "The hint assumes default 150 us IFS and LE 1M. Normal acquisition remains available for other timings.",
+    "Direction is inferred from packet ordering and timing, not a transmitted direction bit.",
+    "CPU comparison uses three alternating paired replays with live receiver also running."
+  ],
+  "live_archive": "/Users/bernardbekker/Documents/router-sdr/tools/iq4/build/before-reply-sync-20261017-144652",
+  "deployment": {
+    "launcher_pid": 9070,
+    "source_alive": true,
+    "packets": 4965,
+    "samples": 4545609728,
+    "lost_samples": 0,
+    "lag_ms": 0.0,
+    "demodulator": "streaming"
+  }
+}

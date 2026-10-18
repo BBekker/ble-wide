@@ -1,0 +1,155 @@
+{
+  "date": "2026-10-17",
+  "machine": "Apple M3 Pro, 11 CPU cores",
+  "mode": "streaming / Metal / planar / four decoder workers / IQ8",
+  "benchmark": {
+    "capture": "tools/iq4/build/precision/capture-002.raw",
+    "repetitions_per_run": 20,
+    "trials_per_version": 3,
+    "order": [
+      "before",
+      "after",
+      "after",
+      "before",
+      "before",
+      "after"
+    ],
+    "samples_per_run": 335544320,
+    "median": {
+      "before": {
+        "decode_cpu_s": 2.975451,
+        "filter_cpu_s": 0.191231,
+        "gpu_s": 0.533223,
+        "capacity_msps": 229.413
+      },
+      "after": {
+        "decode_cpu_s": 2.693817,
+        "filter_cpu_s": 0.102448,
+        "gpu_s": 0.521905,
+        "capacity_msps": 282.554
+      }
+    },
+    "runs": [
+      {
+        "version": "before",
+        "trial": 0,
+        "decode_cpu_s": 3.075517,
+        "filter_cpu_s": 0.196522,
+        "gpu_s": 0.489524,
+        "capacity_msps": 213.099
+      },
+      {
+        "version": "after",
+        "trial": 0,
+        "decode_cpu_s": 2.693817,
+        "filter_cpu_s": 0.102448,
+        "gpu_s": 0.522047,
+        "capacity_msps": 282.554
+      },
+      {
+        "version": "after",
+        "trial": 1,
+        "decode_cpu_s": 2.772417,
+        "filter_cpu_s": 0.10762,
+        "gpu_s": 0.499774,
+        "capacity_msps": 272.903
+      },
+      {
+        "version": "before",
+        "trial": 1,
+        "decode_cpu_s": 2.904298,
+        "filter_cpu_s": 0.186606,
+        "gpu_s": 0.535989,
+        "capacity_msps": 233.753
+      },
+      {
+        "version": "before",
+        "trial": 2,
+        "decode_cpu_s": 2.975451,
+        "filter_cpu_s": 0.191231,
+        "gpu_s": 0.533223,
+        "capacity_msps": 229.413
+      },
+      {
+        "version": "after",
+        "trial": 2,
+        "decode_cpu_s": 2.685535,
+        "filter_cpu_s": 0.101785,
+        "gpu_s": 0.521905,
+        "capacity_msps": 282.942
+      }
+    ],
+    "limitations": "Live receiver was running concurrently. Short replay, not isolated whole-system CPU or battery measurement. GPU timing varied; do not infer a reliable GPU speedup from this run."
+  },
+  "capture_regression": {
+    "captures": 40,
+    "valid_before": 895,
+    "valid_after": 895,
+    "events_before": 1434,
+    "events_after": 1434,
+    "lost": 0,
+    "added": 0,
+    "compared": [
+      "channel",
+      "sample",
+      "access_address",
+      "pdu",
+      "crc",
+      "crc_valid",
+      "expected_crc"
+    ]
+  },
+  "changes": [
+    "Reuse up to six pipeline job input/output buffers after decode completion",
+    "Direct Metal channel-major stores remove transpose kernel and scratch buffer",
+    "Combined exact/near access-address lookup avoids duplicate mutex lookup and Context copying",
+    "Precompute 32 pulse sums per timing phase and subsample",
+    "Reuse observed synchronization samples and weighted moments across timing phases",
+    "Skip duplicate identical corrected/uncorrected synchronization words",
+    "Streaming defaults in executable, web server and Mac launcher"
+  ],
+  "verification": [
+    "check-metal",
+    "check-streaming",
+    "check-reply-sync",
+    "check-packet-noise",
+    "check-decode-pool",
+    "tests/test_ble_wide.py"
+  ],
+  "artifacts": "build/efficiency (local captures and per-run outputs)",
+  "connection_regression": [
+    {
+      "dataset": "old",
+      "before": 49,
+      "after": 49,
+      "exact_match": true
+    },
+    {
+      "dataset": "fresh",
+      "before": 64,
+      "after": 64,
+      "exact_match": true
+    }
+  ],
+  "live_verification": {
+    "observation": {
+      "samples": 4810319872,
+      "packets": 5326,
+      "lost_samples": 0,
+      "resets": 0,
+      "elapsed_s": 30.063708999999996,
+      "filter_cpu_s": 1.2362289999999998,
+      "decode_cpu_s": 34.677293999999996,
+      "gpu_s": 7.746252
+    },
+    "final": {
+      "demodulator": "streaming",
+      "backend": "metal",
+      "decode_threads": 4,
+      "bin_layout": "planar",
+      "source_alive": true,
+      "lag_ms": 0.0,
+      "capacity_msps": 307.458
+    }
+  }
+}

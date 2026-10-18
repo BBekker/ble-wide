@@ -1,0 +1,23 @@
+#!/usr/bin/env python3
+"""Run a command from this checkout with available Homebrew build tools on macOS."""
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+root = Path(__file__).resolve().parents[1]
+env = dict(os.environ)
+paths = []
+if sys.platform == 'darwin' and shutil.which('brew'):
+    brew = Path(subprocess.check_output(['brew', '--prefix'], text=True).strip())
+    paths.extend([brew / 'opt/llvm/bin', brew / 'bin'])
+    if (brew / 'opt/llvm/bin/clang++').is_file():
+        env.setdefault('CXX', str(brew / 'opt/llvm/bin/clang++'))
+        env.setdefault('CC', str(brew / 'opt/llvm/bin/clang'))
+paths.insert(0, root / '.venv/bin')
+env['PATH'] = os.pathsep.join([str(p) for p in paths if p.is_dir()] + [env.get('PATH', '')])
+env['PYTHONDONTWRITEBYTECODE'] = '1'
+os.chdir(root)
+argv = sys.argv[1:] or ['make']
+os.execvpe(argv[0], argv, env)

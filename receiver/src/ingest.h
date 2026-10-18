@@ -1,0 +1,113 @@
+// SPDX-License-Identifier: MIT
+// The unit's UDP export received into a ring of raw sample words, w1700k-stream's reorder buffer.
+// Each datagram carries one completion of the unit's DMA ring, numbered by `seq`: a sample slice,
+// raw (2048 words) or packed to 28 bits (7168 bytes), or a short firmware event that shares the
+// ring. A sample word holds 14-bit I in bits [29:16] and Q in [13:0].
+// Experimental IQ41 carries 2048 four-bit I/Q pairs plus a scale; it is restored
+// to the same raw-word representation (include/iq4.h).
+#pragma once
+
+#include <atomic>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <thread>
+#include <vector>
+
+constexpr unsigned kSliceSamples = 2048;
+constexpr unsigned kLap = 128;  // slices in the unit's 1 MiB capture ring
+
+// Slots are indexed by completion number, so a firmware event occupies a slot without samples.
+// Events consume no sample time: the slices either side of one are contiguous.
+class SampleRing {
+public:
+    // capacity_slices: a power of two.
+    explicit SampleRing(unsigned capacity_slices);
+
+    unsigned capacity_slices() const { return slices_; }
+
+    // Writer: slice `index` of run `run`. Any thread.
+    void put(uint64_t run, uint64_t index, const uint32_t *words);
+    void put_packed(uint64_t run, uint64_t index, const uint32_t *packed);
+    void put_iq4(uint64_t run, uint64_t index, const uint8_t *bytes, unsigned shift, bool eight);
+    void put_event(uint64_t run, uint64_t index);  // a completion that is not samples
+
+    // Readers. A slot's tag names the run and slice it holds; a reader checks it before and after
+    // reading the slice's words, so a slot overwritten meanwhile is noticed (a seqlock).
+    uint64_t tag(uint64_t index) const { return tags_[index & (slices_ - 1)].load(std::memory_order_acquire); }
+    static uint64_t tag_of(uint64_t run, uint64_t index) { return (run << 40) | (index + 1); }
+    static uint64_t event_tag_of(uint64_t run, uint64_t index) { return tag_of(run, index) | kEventBit; }
+    const uint32_t *slice(uint64_t index) const { return &words_[(index & (slices_ - 1)) * kSliceSamples]; }
+
+private:
+    static constexpr uint64_t kEventBit = uint64_t(1) << 63;
+    void claim(uint64_t index);
+    unsigned slices_;
+    std::vector<uint32_t> words_;
+    std::unique_ptr<std::atomic<uint64_t>[]> tags_;
+};
+
+// Receives the stream on IP:PORT with several threads (SO_REUSEPORT; the unit cycles its source
+// port so the flows spread over them) and files every completion into the ring by its sequence
+// number. Multiple destination ports use one receiver per port on either OS.
+// A run starts with the first completion after a second of silence, after a jump in
+// sequence, or after restart_run().
+class Ingest {
+public:
+    struct Stats {
+        uint64_t run = 0;                // current run, 1.. (0: none yet)
+        uint64_t datagrams = 0, bytes = 0;
+        uint64_t slices = 0, packed = 0; // sample slices filed
+        uint64_t events = 0;             // completions that are not samples (firmware events)
+        uint64_t pieces = 0;             // datagrams carrying part of a slice (not reassembled)
+        uint64_t bad = 0;                // wrong magic or length
+        uint64_t late = 0;               // older than the run's start or than the ring holds
+        uint64_t before_start = 0;       // in a run's first second, from before it (joined late)
+        uint64_t duplicates = 0;
+        uint64_t socket_drops = 0;       // SO_RXQ_OVFL, summed over the sockets
+        // The export's integrity: words of raw slices with spare bits set, and slices or 8-sample
+        // lines equal to the same slice or line one capture-ring lap (kLap completions) earlier.
+        uint64_t spare_words = 0, stale_slices = 0, stale_lines = 0;
+        uint64_t newest = 0;             // highest slot index + 1 of the run
+        double run_started = 0;          // steady seconds
+        double last_any = 0;
+    };
+    struct Position {
+        uint64_t run = 0, newest = 0;
+    };
+
+    Ingest(SampleRing &ring, const std::string &bind_ip, unsigned port, unsigned threads, unsigned ports = 1);
+    ~Ingest();
+    Ingest(const Ingest &) = delete;
+    Ingest &operator=(const Ingest &) = delete;
+
+    void start();  // binds the sockets and starts receiving
+    Stats stats() const;
+    uint64_t run() const { return run_.load(std::memory_order_acquire); }
+    uint64_t newest() const { return newest_.load(std::memory_order_acquire); }
+    Position position() const;  // run and newest, read consistently
+    void restart_run();         // the next completion starts a new run (the stream was restarted)
+
+private:
+    struct Worker;
+    void work(Worker &w);
+    void work_device(Worker &w);
+    void take(Worker &w, const uint8_t *data, size_t n, bool fresh, uint64_t t);
+    void take_record(Worker &w, const uint8_t *data, size_t n, uint64_t t);
+    void check(Worker &w, uint64_t run, uint64_t index);
+
+    SampleRing &ring_;
+    const std::string bind_ip_;
+    const unsigned port_, threads_, ports_;
+    std::atomic<bool> stopping_{false};
+    std::vector<std::unique_ptr<Worker>> workers_;
+#ifdef __linux__
+    void *device_map_ = nullptr;
+    size_t device_bytes_ = 0;
+#endif
+
+    // The run: its first sequence number, and the newest slot filled.
+    std::atomic<uint64_t> run_{0}, base_{0}, newest_{0};
+    std::atomic<uint64_t> started_ns_{0}, last_ns_{0};
+    std::atomic<bool> new_run_{false};
+};

@@ -1,0 +1,72 @@
+{
+  "date": "2026-10-16",
+  "sample_rate": 160000000,
+  "component_bits": 8,
+  "saved_captures": {
+    "baseline": 434,
+    "adaptive": 544,
+    "matched": 434,
+    "lost": 0,
+    "added": 110,
+    "seconds": 3.3554432,
+    "decode_cpu_s": {
+      "legacy": 1.561639,
+      "adaptive": 2.5322
+    },
+    "added_by_context": {
+      "advertising": 108,
+      "connection_request": 0,
+      "repeated_crc_seed": 2
+    },
+    "added_below_minus50_dbfs": 11,
+    "weakest_added_dbfs": -63.61
+  },
+  "fresh_holdout": {
+    "baseline": 113,
+    "adaptive": 134,
+    "matched": 113,
+    "lost": 0,
+    "added": 21,
+    "seconds": 0.8388608,
+    "decode_cpu_s": {
+      "legacy": 0.385629,
+      "adaptive": 0.64689
+    },
+    "added_by_context": {
+      "advertising": 20,
+      "connection_request": 0,
+      "repeated_crc_seed": 1
+    },
+    "added_below_minus50_dbfs": 0,
+    "weakest_added_dbfs": -49.21
+  },
+  "synthetic": {
+    "trials": 144,
+    "legacy": 41,
+    "adaptive": 73,
+    "known_connection_trials": 20,
+    "known_connection_legacy": 0,
+    "known_connection_adaptive": 4
+  },
+  "limitations": [
+    "Small independent ~105 ms windows, not a calibrated sensitivity sweep.",
+    "Most measured gains are advertisements; data contexts may be inferred.",
+    "Recovery uses known CRC seeds and cannot recover all unknown connections.",
+    "No PHY 2M, coded PHY, or payload decryption added."
+  ],
+  "deployed_live_validation": {
+    "samples": 6161989632,
+    "packets": 5116,
+    "lost_samples": 0,
+    "lag_ms": 4.506,
+    "capacity_msps": 169.587,
+    "recovered_packets": 1069,
+    "capture_s": 38.5124352,
+    "decode_cpu_s": 31.922601,
+    "processing_s": 36.335231,
+    "backend": "metal",
+    "demodulator": "adaptive",
+    "duration_observed_s": 38.5124352,
+    "maximum_sampled_lag_ms": 4.506
+  }
+}

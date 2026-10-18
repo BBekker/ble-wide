@@ -1,0 +1,19 @@
+BLE Wide was extracted from the working tree of w1700k-sdr on 2026-10-17.
+Source: https://github.com/h0m3us3r/w1700k-sdr
+Working branch: codex/ble-advertising-dsp
+Base commit: 05adca1609ab806a88af0b1b4831df2ee41d6bb8
+The extraction includes local development beyond that commit.
+
+The MIT notice in LICENSE is retained for inherited source.
+include/iq4.h, include/iq8.h and include/w1700k_stream.h are vendored
+format/shared-memory interfaces from that working tree; no router checkout
+is needed to build. advertisements.py derives from host/ble/server.py.
+The test bit sequence is identified in tests/fixtures.py.
+
+The receiver/ UDP ingest service and include/{fft.h,posix.h,build.mk} also
+come from host/stream and host/common in that working tree.
+include/uapi/w1700k_sdr.h retains GPL-2.0 WITH Linux-syscall-note; it is
+a Linux userspace interface, not firmware. Its SPDX license applies to that file.
+
+Router firmware, DSP research, per-device credentials,
+recordings, compiler profiles and build outputs are not part of this repo.

@@ -1,0 +1,1439 @@
+{
+  "implementation": "Single payload decoder with preamble/address acquisition, one timing tracker, four-state fixed-delay Viterbi detector, incremental dewhitening and CRC; no packet retries.",
+  "date": "2026-10-17",
+  "source_sha256": {
+    "streaming-demod.h": "1e8846d47707a516c52214723b5b6919a4b93ec365cd35b2917cf99533e553cd",
+    "decoder.h": "d99f2ebe2edcf261ea08a2ac3662e4149d62085dcc1ece52cf62b9762d21e493",
+    "main.cpp": "a055bc45b90bbacded2f5b99088907291cf2642021afb10722961d67a89046c6"
+  },
+  "original_32": {
+    "baseline": 544,
+    "candidate": 737,
+    "matched": 526,
+    "binary_sha256": "36298f17404282134e53fc4011999db16ce282ed2af580704e9ffb7a3d49aaaa",
+    "modes": {
+      "baseline": "adaptive",
+      "candidate": "streaming"
+    },
+    "lost": 18,
+    "added": 211,
+    "seconds": 3.3554432,
+    "decode_cpu_s": {
+      "adaptive": 2.25728,
+      "streaming": 2.74108
+    },
+    "added_by_context": {
+      "advertising": 209,
+      "connection_request": 0,
+      "repeated_crc_seed": 2
+    },
+    "added_below_minus50_dbfs": 18,
+    "weakest_added_dbfs": -64.96
+  },
+  "holdout_8": {
+    "baseline": 134,
+    "candidate": 156,
+    "matched": 129,
+    "binary_sha256": "36298f17404282134e53fc4011999db16ce282ed2af580704e9ffb7a3d49aaaa",
+    "modes": {
+      "baseline": "adaptive",
+      "candidate": "streaming"
+    },
+    "lost": 5,
+    "added": 27,
+    "seconds": 0.8388608,
+    "decode_cpu_s": {
+      "adaptive": 0.647015,
+      "streaming": 0.733256
+    },
+    "added_by_context": {
+      "advertising": 27,
+      "connection_request": 0,
+      "repeated_crc_seed": 0
+    },
+    "added_below_minus50_dbfs": 1,
+    "weakest_added_dbfs": -50.32
+  },
+  "combined": {
+    "baseline": 678,
+    "streaming": 893,
+    "retained": 655,
+    "lost": 23,
+    "added": 238
+  },
+  "contexts": {
+    "adaptive": {
+      "advertising": 654,
+      "repeated_crc_seed": 24
+    },
+    "streaming": {
+      "advertising": 877,
+      "repeated_crc_seed": 16
+    }
+  },
+  "lost_contexts": {
+    "advertising": 13,
+    "repeated_crc_seed": 10
+  },
+  "signal_levels": [
+    {
+      "low_dbfs": -200,
+      "high_dbfs": -50,
+      "baseline": 17,
+      "retained": 17,
+      "lost": 0,
+      "added": 19
+    },
+    {
+      "low_dbfs": -50,
+      "high_dbfs": -45,
+      "baseline": 36,
+      "retained": 34,
+      "lost": 2,
+      "added": 24
+    },
+    {
+      "low_dbfs": -45,
+      "high_dbfs": -40,
+      "baseline": 11,
+      "retained": 9,
+      "lost": 2,
+      "added": 3
+    },
+    {
+      "low_dbfs": -40,
+      "high_dbfs": 100,
+      "baseline": 614,
+      "retained": 595,
+      "lost": 19,
+      "added": 192
+    }
+  ],
+  "synthetic_awgn": {
+    "snr_definition": "100^2/(2*sigma^2) at 2 Msps, without channelizer. Each trial has identical IQ for both decoders. No hardware sensitivity calibration.",
+    "trials": [
+      {
+        "snr_db": 4,
+        "trials": 80,
+        "adaptive": 0,
+        "streaming": 1,
+        "both": 0
+      },
+      {
+        "snr_db": 6,
+        "trials": 80,
+        "adaptive": 0,
+        "streaming": 27,
+        "both": 0
+      },
+      {
+        "snr_db": 8,
+        "trials": 80,
+        "adaptive": 9,
+        "streaming": 69,
+        "both": 8
+      },
+      {
+        "snr_db": 10,
+        "trials": 80,
+        "adaptive": 50,
+        "streaming": 78,
+        "both": 49
+      },
+      {
+        "snr_db": 12,
+        "trials": 80,
+        "adaptive": 76,
+        "streaming": 80,
+        "both": 76
+      },
+      {
+        "snr_db": 14,
+        "trials": 80,
+        "adaptive": 80,
+        "streaming": 80,
+        "both": 80
+      }
+    ]
+  },
+  "tests": [
+    "one payload start and one committed-bit/CRC update per payload bit for clean and bad-CRC packets",
+    "bounded sample-window and single phase-evaluation audits",
+    "clean CFO/fractional timing, all whitening channels, long packets with +/-90ppm skew, reset and gap cancellation",
+    "blind CRC seed confirmation at both preamble polarities",
+    "two million noise samples with no false published packets",
+    "40 simultaneous channels through CPU and Metal, including processing-chunk seam",
+    "ASan and UBSan",
+    "viewer streaming tests"
+  ],
+  "deployment": "Opt-in --demod streaming. Default and live viewer remain adaptive because blind connection discovery still regresses.",
+  "limitations": [
+    "One overlapping packet per channel; a false acquisition may hold the decoder until rejection.",
+    "Independent ~105ms recordings reset discovery context; not a continuous connection-following benchmark.",
+    "Known-CRC and inferred-CRC packets have distinct validation contexts.",
+    "No calibrated dBm sensitivity or guaranteed lossless real-time result."
+  ],
+  "benchmark": {
+    "binary_sha256": "36298f17404282134e53fc4011999db16ce282ed2af580704e9ffb7a3d49aaaa",
+    "capture": "/Users/bernardbekker/Documents/router-sdr/tools/iq4/build/precision/capture-002.raw",
+    "repeat": 40,
+    "backend": "metal",
+    "runs": [
+      {
+        "mode": "adaptive",
+        "type": "status",
+        "samples": 671088640,
+        "packets": 1400,
+        "lost_samples": 0,
+        "resets": 40,
+        "lag_ms": 0.0,
+        "elapsed_s": 4.261239,
+        "processing_s": 3.049852,
+        "capacity_msps": 220.04,
+        "source_alive": false,
+        "backend": "metal",
+        "demodulator": "adaptive",
+        "recovery_attempts": 760,
+        "recovered_packets": 160,
+        "preamble_candidates": 0,
+        "preamble_syncs": 0,
+        "preamble_packets": 0,
+        "filter_cpu_s": 0.210408,
+        "decode_cpu_s": 2.708974,
+        "payload_starts": 0,
+        "payload_symbols": 0,
+        "trellis_updates": 0,
+        "gpu_s": 0.356824,
+        "capture_s": 4.194304,
+        "epoch": 40,
+        "channels": [
+          {
+            "channel": 0,
+            "mhz": 2404,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 880
+          },
+          {
+            "channel": 1,
+            "mhz": 2406,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1040
+          },
+          {
+            "channel": 2,
+            "mhz": 2408,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1040
+          },
+          {
+            "channel": 3,
+            "mhz": 2410,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 960
+          },
+          {
+            "channel": 4,
+            "mhz": 2412,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1320
+          },
+          {
+            "channel": 5,
+            "mhz": 2414,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1120
+          },
+          {
+            "channel": 6,
+            "mhz": 2416,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 840
+          },
+          {
+            "channel": 7,
+            "mhz": 2418,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1200
+          },
+          {
+            "channel": 8,
+            "mhz": 2420,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1160
+          },
+          {
+            "channel": 9,
+            "mhz": 2422,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 840
+          },
+          {
+            "channel": 10,
+            "mhz": 2424,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1160
+          },
+          {
+            "channel": 11,
+            "mhz": 2428,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1080
+          },
+          {
+            "channel": 12,
+            "mhz": 2430,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 920
+          },
+          {
+            "channel": 13,
+            "mhz": 2432,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1200
+          },
+          {
+            "channel": 14,
+            "mhz": 2434,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 880
+          },
+          {
+            "channel": 15,
+            "mhz": 2436,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1200
+          },
+          {
+            "channel": 16,
+            "mhz": 2438,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1120
+          },
+          {
+            "channel": 17,
+            "mhz": 2440,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1280
+          },
+          {
+            "channel": 18,
+            "mhz": 2442,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1440
+          },
+          {
+            "channel": 19,
+            "mhz": 2444,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1040
+          },
+          {
+            "channel": 20,
+            "mhz": 2446,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1000
+          },
+          {
+            "channel": 21,
+            "mhz": 2448,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1360
+          },
+          {
+            "channel": 22,
+            "mhz": 2450,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 760
+          },
+          {
+            "channel": 23,
+            "mhz": 2452,
+            "packets": 40,
+            "crc_fail": 0,
+            "candidates": 1080
+          },
+          {
+            "channel": 24,
+            "mhz": 2454,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1440
+          },
+          {
+            "channel": 25,
+            "mhz": 2456,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 960
+          },
+          {
+            "channel": 26,
+            "mhz": 2458,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1080
+          },
+          {
+            "channel": 27,
+            "mhz": 2460,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 960
+          },
+          {
+            "channel": 28,
+            "mhz": 2462,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1000
+          },
+          {
+            "channel": 29,
+            "mhz": 2464,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1080
+          },
+          {
+            "channel": 30,
+            "mhz": 2466,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 960
+          },
+          {
+            "channel": 31,
+            "mhz": 2468,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1000
+          },
+          {
+            "channel": 32,
+            "mhz": 2470,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1000
+          },
+          {
+            "channel": 33,
+            "mhz": 2472,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1160
+          },
+          {
+            "channel": 34,
+            "mhz": 2474,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1160
+          },
+          {
+            "channel": 35,
+            "mhz": 2476,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 920
+          },
+          {
+            "channel": 36,
+            "mhz": 2478,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 880
+          },
+          {
+            "channel": 37,
+            "mhz": 2402,
+            "packets": 480,
+            "crc_fail": 80,
+            "candidates": 1000
+          },
+          {
+            "channel": 38,
+            "mhz": 2426,
+            "packets": 440,
+            "crc_fail": 160,
+            "candidates": 840
+          },
+          {
+            "channel": 39,
+            "mhz": 2480,
+            "packets": 440,
+            "crc_fail": 80,
+            "candidates": 1320
+          }
+        ]
+      },
+      {
+        "mode": "streaming",
+        "type": "status",
+        "samples": 671088640,
+        "packets": 1600,
+        "lost_samples": 0,
+        "resets": 40,
+        "lag_ms": 0.0,
+        "elapsed_s": 4.835493,
+        "processing_s": 3.717326,
+        "capacity_msps": 180.53,
+        "source_alive": false,
+        "backend": "metal",
+        "demodulator": "streaming",
+        "recovery_attempts": 0,
+        "recovered_packets": 0,
+        "preamble_candidates": 157640,
+        "preamble_syncs": 2320,
+        "preamble_packets": 1600,
+        "filter_cpu_s": 0.210874,
+        "decode_cpu_s": 3.37393,
+        "payload_starts": 2320,
+        "payload_symbols": 523840,
+        "trellis_updates": 540080,
+        "gpu_s": 0.420198,
+        "capture_s": 4.194304,
+        "epoch": 40,
+        "channels": [
+          {
+            "channel": 0,
+            "mhz": 2404,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 1,
+            "mhz": 2406,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 2,
+            "mhz": 2408,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 3,
+            "mhz": 2410,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 4,
+            "mhz": 2412,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 5,
+            "mhz": 2414,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 6,
+            "mhz": 2416,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 7,
+            "mhz": 2418,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 8,
+            "mhz": 2420,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 9,
+            "mhz": 2422,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 10,
+            "mhz": 2424,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 40
+          },
+          {
+            "channel": 11,
+            "mhz": 2428,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 12,
+            "mhz": 2430,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 13,
+            "mhz": 2432,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 14,
+            "mhz": 2434,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 15,
+            "mhz": 2436,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 16,
+            "mhz": 2438,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 17,
+            "mhz": 2440,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 18,
+            "mhz": 2442,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 19,
+            "mhz": 2444,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 20,
+            "mhz": 2446,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 21,
+            "mhz": 2448,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 22,
+            "mhz": 2450,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 23,
+            "mhz": 2452,
+            "packets": 80,
+            "crc_fail": 0,
+            "candidates": 40
+          },
+          {
+            "channel": 24,
+            "mhz": 2454,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 25,
+            "mhz": 2456,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 26,
+            "mhz": 2458,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 27,
+            "mhz": 2460,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 28,
+            "mhz": 2462,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 29,
+            "mhz": 2464,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 30,
+            "mhz": 2466,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 31,
+            "mhz": 2468,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 32,
+            "mhz": 2470,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 33,
+            "mhz": 2472,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 34,
+            "mhz": 2474,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 40
+          },
+          {
+            "channel": 35,
+            "mhz": 2476,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 36,
+            "mhz": 2478,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 37,
+            "mhz": 2402,
+            "packets": 600,
+            "crc_fail": 160,
+            "candidates": 0
+          },
+          {
+            "channel": 38,
+            "mhz": 2426,
+            "packets": 480,
+            "crc_fail": 160,
+            "candidates": 0
+          },
+          {
+            "channel": 39,
+            "mhz": 2480,
+            "packets": 440,
+            "crc_fail": 240,
+            "candidates": 0
+          }
+        ]
+      },
+      {
+        "mode": "streaming",
+        "type": "status",
+        "samples": 671088640,
+        "packets": 1600,
+        "lost_samples": 0,
+        "resets": 40,
+        "lag_ms": 0.0,
+        "elapsed_s": 4.828321,
+        "processing_s": 3.717841,
+        "capacity_msps": 180.505,
+        "source_alive": false,
+        "backend": "metal",
+        "demodulator": "streaming",
+        "recovery_attempts": 0,
+        "recovered_packets": 0,
+        "preamble_candidates": 157640,
+        "preamble_syncs": 2320,
+        "preamble_packets": 1600,
+        "filter_cpu_s": 0.209687,
+        "decode_cpu_s": 3.378478,
+        "payload_starts": 2320,
+        "payload_symbols": 523840,
+        "trellis_updates": 540080,
+        "gpu_s": 0.393323,
+        "capture_s": 4.194304,
+        "epoch": 40,
+        "channels": [
+          {
+            "channel": 0,
+            "mhz": 2404,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 1,
+            "mhz": 2406,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 2,
+            "mhz": 2408,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 3,
+            "mhz": 2410,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 4,
+            "mhz": 2412,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 5,
+            "mhz": 2414,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 6,
+            "mhz": 2416,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 7,
+            "mhz": 2418,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 8,
+            "mhz": 2420,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 9,
+            "mhz": 2422,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 10,
+            "mhz": 2424,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 40
+          },
+          {
+            "channel": 11,
+            "mhz": 2428,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 12,
+            "mhz": 2430,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 13,
+            "mhz": 2432,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 14,
+            "mhz": 2434,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 15,
+            "mhz": 2436,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 16,
+            "mhz": 2438,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 17,
+            "mhz": 2440,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 18,
+            "mhz": 2442,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 19,
+            "mhz": 2444,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 20,
+            "mhz": 2446,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 21,
+            "mhz": 2448,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 22,
+            "mhz": 2450,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 23,
+            "mhz": 2452,
+            "packets": 80,
+            "crc_fail": 0,
+            "candidates": 40
+          },
+          {
+            "channel": 24,
+            "mhz": 2454,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 25,
+            "mhz": 2456,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 26,
+            "mhz": 2458,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 27,
+            "mhz": 2460,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 28,
+            "mhz": 2462,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 29,
+            "mhz": 2464,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 30,
+            "mhz": 2466,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 31,
+            "mhz": 2468,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 32,
+            "mhz": 2470,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 33,
+            "mhz": 2472,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 34,
+            "mhz": 2474,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 40
+          },
+          {
+            "channel": 35,
+            "mhz": 2476,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 36,
+            "mhz": 2478,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 0
+          },
+          {
+            "channel": 37,
+            "mhz": 2402,
+            "packets": 600,
+            "crc_fail": 160,
+            "candidates": 0
+          },
+          {
+            "channel": 38,
+            "mhz": 2426,
+            "packets": 480,
+            "crc_fail": 160,
+            "candidates": 0
+          },
+          {
+            "channel": 39,
+            "mhz": 2480,
+            "packets": 440,
+            "crc_fail": 240,
+            "candidates": 0
+          }
+        ]
+      },
+      {
+        "mode": "adaptive",
+        "type": "status",
+        "samples": 671088640,
+        "packets": 1400,
+        "lost_samples": 0,
+        "resets": 40,
+        "lag_ms": 0.0,
+        "elapsed_s": 4.166866,
+        "processing_s": 3.056369,
+        "capacity_msps": 219.571,
+        "source_alive": false,
+        "backend": "metal",
+        "demodulator": "adaptive",
+        "recovery_attempts": 760,
+        "recovered_packets": 160,
+        "preamble_candidates": 0,
+        "preamble_syncs": 0,
+        "preamble_packets": 0,
+        "filter_cpu_s": 0.208914,
+        "decode_cpu_s": 2.721326,
+        "payload_starts": 0,
+        "payload_symbols": 0,
+        "trellis_updates": 0,
+        "gpu_s": 0.395411,
+        "capture_s": 4.194304,
+        "epoch": 40,
+        "channels": [
+          {
+            "channel": 0,
+            "mhz": 2404,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 880
+          },
+          {
+            "channel": 1,
+            "mhz": 2406,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1040
+          },
+          {
+            "channel": 2,
+            "mhz": 2408,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1040
+          },
+          {
+            "channel": 3,
+            "mhz": 2410,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 960
+          },
+          {
+            "channel": 4,
+            "mhz": 2412,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1320
+          },
+          {
+            "channel": 5,
+            "mhz": 2414,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1120
+          },
+          {
+            "channel": 6,
+            "mhz": 2416,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 840
+          },
+          {
+            "channel": 7,
+            "mhz": 2418,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1200
+          },
+          {
+            "channel": 8,
+            "mhz": 2420,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1160
+          },
+          {
+            "channel": 9,
+            "mhz": 2422,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 840
+          },
+          {
+            "channel": 10,
+            "mhz": 2424,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1160
+          },
+          {
+            "channel": 11,
+            "mhz": 2428,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1080
+          },
+          {
+            "channel": 12,
+            "mhz": 2430,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 920
+          },
+          {
+            "channel": 13,
+            "mhz": 2432,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1200
+          },
+          {
+            "channel": 14,
+            "mhz": 2434,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 880
+          },
+          {
+            "channel": 15,
+            "mhz": 2436,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1200
+          },
+          {
+            "channel": 16,
+            "mhz": 2438,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1120
+          },
+          {
+            "channel": 17,
+            "mhz": 2440,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1280
+          },
+          {
+            "channel": 18,
+            "mhz": 2442,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1440
+          },
+          {
+            "channel": 19,
+            "mhz": 2444,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1040
+          },
+          {
+            "channel": 20,
+            "mhz": 2446,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1000
+          },
+          {
+            "channel": 21,
+            "mhz": 2448,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1360
+          },
+          {
+            "channel": 22,
+            "mhz": 2450,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 760
+          },
+          {
+            "channel": 23,
+            "mhz": 2452,
+            "packets": 40,
+            "crc_fail": 0,
+            "candidates": 1080
+          },
+          {
+            "channel": 24,
+            "mhz": 2454,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1440
+          },
+          {
+            "channel": 25,
+            "mhz": 2456,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 960
+          },
+          {
+            "channel": 26,
+            "mhz": 2458,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1080
+          },
+          {
+            "channel": 27,
+            "mhz": 2460,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 960
+          },
+          {
+            "channel": 28,
+            "mhz": 2462,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1000
+          },
+          {
+            "channel": 29,
+            "mhz": 2464,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1080
+          },
+          {
+            "channel": 30,
+            "mhz": 2466,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 960
+          },
+          {
+            "channel": 31,
+            "mhz": 2468,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1000
+          },
+          {
+            "channel": 32,
+            "mhz": 2470,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1000
+          },
+          {
+            "channel": 33,
+            "mhz": 2472,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1160
+          },
+          {
+            "channel": 34,
+            "mhz": 2474,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 1160
+          },
+          {
+            "channel": 35,
+            "mhz": 2476,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 920
+          },
+          {
+            "channel": 36,
+            "mhz": 2478,
+            "packets": 0,
+            "crc_fail": 0,
+            "candidates": 880
+          },
+          {
+            "channel": 37,
+            "mhz": 2402,
+            "packets": 480,
+            "crc_fail": 80,
+            "candidates": 1000
+          },
+          {
+            "channel": 38,
+            "mhz": 2426,
+            "packets": 440,
+            "crc_fail": 160,
+            "candidates": 840
+          },
+          {
+            "channel": 39,
+            "mhz": 2480,
+            "packets": 440,
+            "crc_fail": 80,
+            "candidates": 1320
+          }
+        ]
+      }
+    ],
+    "medians": {
+      "adaptive": {
+        "capacity_msps": 219.8055,
+        "decode_cpu_s": 2.71515,
+        "processing_s": 3.0531105,
+        "packets": 1400.0
+      },
+      "streaming": {
+        "capacity_msps": 180.51749999999998,
+        "decode_cpu_s": 3.376204,
+        "processing_s": 3.7175835,
+        "packets": 1600.0
+      }
+    },
+    "limitations": "Elapsed processing times, not isolated thread CPU times. Excludes file I/O and IQ quantization; other system load is uncontrolled."
+  }
+}

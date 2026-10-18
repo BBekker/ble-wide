@@ -1,0 +1,36 @@
+{
+  "date": "2026-10-17",
+  "scope": "Paired offline precision test on fresh raw DMA captures while live transport remains IQ8",
+  "captures": 16,
+  "seconds": 1.6777216,
+  "samples_per_capture": 16777216,
+  "decoder": "streaming, Metal, four workers; reply synchronization and exact-address fix enabled",
+  "binary_sha256": "dca9350e088d0295b1545552ded340f125dad51a65f800b1afc701351b2642ad",
+  "context_source": "Current viewer connection context, seeded AFTER each file-mode registry reset. Main active context originally observed in CONNECT_IND.",
+  "connection_counts": {
+    "iq8": 48,
+    "iq12": 48,
+    "raw14": 48
+  },
+  "all_packet_counts": {
+    "iq8": 417,
+    "iq12": 419,
+    "raw14": 419
+  },
+  "matching_8_and_12": 48,
+  "connection_8_only": 0,
+  "connection_12_only": 0,
+  "original_precision_connection_only": 0,
+  "complete_expected_reply_windows": 29,
+  "decoded_reply_pairs": 19,
+  "weakest_paired_reply_dbfs": -50.04,
+  "capture_directory": "/Users/bernardbekker/Documents/router-sdr/host/ble-wide/build/reply-precision/20261017-145118",
+  "limitations": [
+    "Sixteen disjoint roughly 105 ms captures, not the earlier 8-bit recording. Cannot recreate discarded bits from that recording.",
+    "Reply direction inferred from same-address/channel packet order and default LE 1M 150 us IFS. Lone packets have no independently known transmitter.",
+    "No extra connection packets appeared even at original precision; this does not prove RF absence or identify the remaining decoder/RF failure.",
+    "12-bit data is offline block-scaled quantization simulation, not implemented or benchmarked 12-bit network transport.",
+    "Preliminary unseeded result files are not used; seeded-* outputs and seeded-results.json are the comparison.",
+    "Same sample data and decoder for all precisions, with CRC verification using preloaded connection contexts."
+  ]
+}

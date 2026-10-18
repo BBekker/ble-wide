@@ -1,0 +1,308 @@
+{
+  "date": "2026-10-17",
+  "platform": "Apple M3 Pro, macOS 15.7.4",
+  "configuration": {
+    "sample_rate_msps": 160,
+    "format": "IQ81, signed 8-bit I/Q with per-block scale",
+    "udp_records": 2,
+    "udp_payload_bytes": 8224,
+    "ports": 2,
+    "interface": "en10",
+    "link_gbps": 5,
+    "mtu": 9000,
+    "adapter": "RTL8157",
+    "driver": "Realtek DriverKit 1.1.0",
+    "decoder": "streaming, Metal, 4 decode workers"
+  },
+  "changes": [
+    "Optional runtime-resolved Darwin recvmsg_x batch receive with recvmsg fallback",
+    "Reuse receive descriptors and reject truncated datagrams",
+    "NEON eight-sample IQ8 reconstruction, preserving scaling and clipping",
+    "Publish uncorrected samples directly on scheduler thread, retaining worker pool for correction"
+  ],
+  "method": "Two alternating 30-second baseline/final live intervals, after startup; no builds or regression suites during timed intervals. ps cumulative CPU, Mach host_statistics CPU ticks, netstat en10 counters, viewer counters. Same radio and decoder configuration. Background desktop activity varied.",
+  "units": "100% CPU = one logical core. Kernel and per-process CPU accounting overlap; do not add them.",
+  "medians": {
+    "before": {
+      "receiver_cpu_percent": 36.75532690268213,
+      "driver_cpu_percent": 30.978975959173816,
+      "whole_machine_kernel_cpu_percent": 168.79617940361715,
+      "packets_per_second": 39189.675622777344
+    },
+    "direct": {
+      "receiver_cpu_percent": 28.913507604824545,
+      "driver_cpu_percent": 31.09412662167321,
+      "whole_machine_kernel_cpu_percent": 159.70196928642653,
+      "packets_per_second": 39183.88889979966
+    }
+  },
+  "receiver_cpu_reduction_percent": 21.335191273418786,
+  "trials": [
+    {
+      "variant": "before",
+      "wall_s": 30.038072124822065,
+      "system_cpu_percent_one_core": {
+        "user": 140.23538860743852,
+        "system": 150.93908315828494,
+        "idle": 808.8255282342766,
+        "nice": 0.0
+      },
+      "network_per_second": {
+        "packets": 39180.3773261288,
+        "errors": 0.0,
+        "bytes": 323852559.56427747
+      },
+      "cpu_percent": {
+        "com.realtek.dext.RTL815xEthernet:3714": 0.0,
+        "w1700k-stream": 35.98766244078333,
+        "w1700k-ble-wide": 90.21883923637637,
+        "com.realtek.dext.RTL815xEthernet:45670": 0.0,
+        "com.realtek.dext.RTL815xEthernet:57735": 31.060581921606975,
+        "com.realtek.dext.RTL815xEthernet:95566": 0.0
+      },
+      "delta": {
+        "samples": 4844486656,
+        "packets": 4381,
+        "lost_samples": 0,
+        "resets": 0,
+        "decode_cpu_s": 23.566446,
+        "gpu_s": 5.74432
+      },
+      "final": {
+        "source_alive": true,
+        "lag_ms": 0.0,
+        "backend": "metal",
+        "demodulator": "streaming"
+      }
+    },
+    {
+      "variant": "before",
+      "wall_s": 30.034918832825497,
+      "system_cpu_percent_one_core": {
+        "user": 200.5222496909765,
+        "system": 186.65327564894932,
+        "idle": 712.8244746600742,
+        "nice": 0.0
+      },
+      "network_per_second": {
+        "packets": 39198.97391942589,
+        "errors": 0.0,
+        "bytes": 324006002.08595675
+      },
+      "cpu_percent": {
+        "com.realtek.dext.RTL815xEthernet:3714": 0.0,
+        "w1700k-stream": 37.522991364580925,
+        "w1700k-ble-wide": 99.01808014042916,
+        "com.realtek.dext.RTL815xEthernet:45670": 0.0,
+        "com.realtek.dext.RTL815xEthernet:57735": 30.89736999674066,
+        "com.realtek.dext.RTL815xEthernet:95566": 0.0
+      },
+      "delta": {
+        "samples": 4809668608,
+        "packets": 4834,
+        "lost_samples": 0,
+        "resets": 0,
+        "decode_cpu_s": 25.787488999999997,
+        "gpu_s": 6.103508
+      },
+      "final": {
+        "source_alive": true,
+        "lag_ms": 0.0,
+        "backend": "metal",
+        "demodulator": "streaming"
+      }
+    },
+    {
+      "variant": "direct",
+      "wall_s": 30.035052417078987,
+      "system_cpu_percent_one_core": {
+        "user": 130.34348791317217,
+        "system": 144.82609768130243,
+        "idle": 824.8304144055254,
+        "nice": 0.0
+      },
+      "network_per_second": {
+        "packets": 39186.54722675741,
+        "errors": 0.0,
+        "bytes": 323903557.51362216
+      },
+      "cpu_percent": {
+        "com.realtek.dext.RTL815xEthernet:3714": 0.0,
+        "w1700k-stream": 28.566622361281816,
+        "w1700k-ble-wide": 86.43234458028857,
+        "com.realtek.dext.RTL815xEthernet:45670": 0.0,
+        "com.realtek.dext.RTL815xEthernet:57735": 31.1302935988279,
+        "com.realtek.dext.RTL815xEthernet:95566": 0.0
+      },
+      "delta": {
+        "samples": 4804427776,
+        "packets": 4734,
+        "lost_samples": 0,
+        "resets": 0,
+        "decode_cpu_s": 22.256618,
+        "gpu_s": 5.6816830000000005
+      },
+      "final": {
+        "source_alive": true,
+        "lag_ms": 0.0,
+        "backend": "metal",
+        "demodulator": "streaming"
+      }
+    },
+    {
+      "variant": "direct",
+      "wall_s": 30.040608291048557,
+      "system_cpu_percent_one_core": {
+        "user": 183.91627820825488,
+        "system": 174.57784089155064,
+        "idle": 741.5058809001945,
+        "nice": 0.0
+      },
+      "network_per_second": {
+        "packets": 39181.230572841916,
+        "errors": 0.0,
+        "bytes": 323860157.08273846
+      },
+      "cpu_percent": {
+        "com.realtek.dext.RTL815xEthernet:3714": 0.0,
+        "w1700k-stream": 29.260392848367275,
+        "w1700k-ble-wide": 94.7717160856674,
+        "com.realtek.dext.RTL815xEthernet:45670": 0.0,
+        "com.realtek.dext.RTL815xEthernet:57735": 31.057959644518522,
+        "com.realtek.dext.RTL815xEthernet:95566": 0.0
+      },
+      "delta": {
+        "samples": 4806363136,
+        "packets": 4282,
+        "lost_samples": 0,
+        "resets": 0,
+        "decode_cpu_s": 24.519529000000002,
+        "gpu_s": 6.015675000000001
+      },
+      "final": {
+        "source_alive": true,
+        "lag_ms": 0.0,
+        "backend": "metal",
+        "demodulator": "streaming"
+      }
+    }
+  ],
+  "stopped_capture": {
+    "wall_s": 30.06332016689703,
+    "system_cpu_percent_one_core": {
+      "user": 122.3151047207952,
+      "system": 75.0007599477156,
+      "idle": 902.6841353314892,
+      "nice": 0.0
+    },
+    "network_per_second": {
+      "packets": 0.2328418804423258,
+      "errors": 0.0,
+      "bytes": 22.552399277128128
+    },
+    "cpu_percent": {
+      "com.realtek.dext.RTL815xEthernet:3714": 0.0,
+      "com.realtek.dext.RTL815xEthernet:45670": 0.0,
+      "com.realtek.dext.RTL815xEthernet:57735": 0.0665262515443013,
+      "com.realtek.dext.RTL815xEthernet:95566": 0.0
+    },
+    "delta": {},
+    "final": {}
+  },
+  "validation": [
+    "10 UDP/shared-memory integration tests passed with batch receive enabled and with W1700K_DISABLE_RECVMSG_X fallback",
+    "IQ8 vector/scalar equivalence for every I/Q byte pair at all 8 scales, including unaligned input, tails and output sentinels",
+    "Four IQ precision tests passed",
+    "Correction/direct transitions, incomplete tail publication, reordered records, malformed pair rejection, oversized datagram recovery, restarts and sample values covered",
+    "No new lost samples or decoder resets in either final 30-second comparison interval",
+    "Read-only system measurement tool smoke-tested against running receiver"
+  ],
+  "limitations": [
+    "Wire packet rate unchanged: around 39,190 packets/s. Driver CPU remained approximately 31% of one core.",
+    "Kernel CPU includes USB/network, decoder/GPU interactions, and unrelated applications; whole-machine improvement is not isolated by this experiment.",
+    "Stopped-capture interval also stopped the decoder and viewer; it cannot attribute the entire kernel difference to Ethernet alone.",
+    "Driver stack sampling and powermetrics require privileges unavailable to this session. No driver or system-wide tunables changed.",
+    "One preliminary batched-version restart had startup loss/overruns while build/test work overlapped; later direct-version comparison runs had zero stream losses including startup.",
+    "No claim of uninterrupted loss-free reception: the longer final run had a later loss burst, recorded separately from the zero-loss timed trials."
+  ],
+  "source_sha256": {
+    "host/stream/src/ingest.cpp": "b5ac0f46731d6d8547264f876e7fbf9f12cd83880eba344b78246323c3ed949f",
+    "host/stream/src/publish.cpp": "f770f225030a23bee0ca9f79423e02a837826191ad9b312431ae337f4363863e",
+    "host/common/iq8.h": "0abb78f9b75881c2c41640db680a3bcc57c3dfb22adfbe815135c8eb26d219aa",
+    "tests/test_stream.py": "74f77068d9020b516ebd18a14ac770b03f36acf86b3750363ff48974489af060",
+    "tests/test_iq_precision.py": "2cd0bff902c4372d33cbd85d233b6dcdd8eb3bb2f614f9c015663e1f1054d6bf",
+    "tools/iq4/measure-mac-network.py": "a4d5cacafc4673896356322c0e15297e825721e7810c1cc93d8dd7ce2424a30c"
+  },
+  "post_comparison_observation": {
+    "stream_lost_slices": 4920,
+    "samples_per_slice": 2048,
+    "stream_overruns": 0,
+    "udp_full_socket_buffer_counter_before": 87429277,
+    "udp_full_socket_buffer_counter_after": 87431311,
+    "note": "One later loss burst after the timed comparison windows. The UDP counter is system-wide; its increase identifies socket pressure but does not attribute every missing slice. No causal attribution to the optimization is established.",
+    "udp_full_socket_buffer_counter_after_final_check": 87431311,
+    "additional_lost_samples_in_final_check": 0
+  },
+  "final_verification": {
+    "wall_s": 30.45131758390926,
+    "percent_units": "100% = one logical core; system and process columns overlap",
+    "system_cpu_percent": {
+      "user": 158.49534564321684,
+      "system": 157.62246299404853,
+      "idle": 783.8821913627346,
+      "nice": 0.0
+    },
+    "process_cpu_percent": [
+      {
+        "pid": 3714,
+        "name": "com.realtek.dext.RTL815xEthernet",
+        "percent": 0.0
+      },
+      {
+        "pid": 27402,
+        "name": "w1700k-stream",
+        "percent": 28.47167442298558
+      },
+      {
+        "pid": 27404,
+        "name": "w1700k-ble-wide",
+        "percent": 86.49872021931247
+      },
+      {
+        "pid": 45670,
+        "name": "com.realtek.dext.RTL815xEthernet",
+        "percent": 0.0
+      },
+      {
+        "pid": 57735,
+        "name": "com.realtek.dext.RTL815xEthernet",
+        "percent": 31.09881854504029
+      },
+      {
+        "pid": 95566,
+        "name": "com.realtek.dext.RTL815xEthernet",
+        "percent": 0.0
+      }
+    ],
+    "processes_changed": [],
+    "network_per_second": {
+      "packets": 39062.97311182857,
+      "errors": 0.0,
+      "bytes": 322882532.1238454
+    },
+    "receiver_delta": {
+      "samples": 4845928448,
+      "packets": 5591,
+      "lost_samples": 0,
+      "resets": 0,
+      "decode_cpu_s": 22.475425,
+      "gpu_s": 5.678308000000001
+    },
+    "receiver_final": {
+      "source_alive": true,
+      "lag_ms": 0.0,
+      "backend": "metal",
+      "demodulator": "streaming"
+    }
+  }
+}

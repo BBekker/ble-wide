@@ -1,0 +1,104 @@
+{
+  "original": {
+    "baseline": 544,
+    "adaptive": 556,
+    "matched": 544,
+    "modes": {
+      "baseline": "adaptive",
+      "candidate": "preamble"
+    },
+    "lost": 0,
+    "added": 12,
+    "seconds": 3.3554432,
+    "decode_cpu_s": {
+      "adaptive": 3.032403,
+      "preamble": 3.69864
+    },
+    "added_by_context": {
+      "advertising": 7,
+      "connection_request": 0,
+      "repeated_crc_seed": 5
+    },
+    "added_below_minus50_dbfs": 0,
+    "weakest_added_dbfs": -36.28
+  },
+  "holdout": {
+    "baseline": 134,
+    "adaptive": 138,
+    "matched": 134,
+    "modes": {
+      "baseline": "adaptive",
+      "candidate": "preamble"
+    },
+    "lost": 0,
+    "added": 4,
+    "seconds": 0.8388608,
+    "decode_cpu_s": {
+      "adaptive": 0.78821,
+      "preamble": 0.924993
+    },
+    "added_by_context": {
+      "advertising": 2,
+      "connection_request": 0,
+      "repeated_crc_seed": 2
+    },
+    "added_below_minus50_dbfs": 0,
+    "weakest_added_dbfs": -34.71
+  },
+  "throughput": [
+    {
+      "type": "status",
+      "samples": 671088640,
+      "packets": 1400,
+      "lost_samples": 0,
+      "resets": 40,
+      "lag_ms": 0.0,
+      "elapsed_s": 5.743489,
+      "processing_s": 4.054947,
+      "capacity_msps": 165.499,
+      "source_alive": false,
+      "backend": "metal",
+      "demodulator": "adaptive",
+      "recovery_attempts": 760,
+      "recovered_packets": 160,
+      "preamble_candidates": 0,
+      "preamble_syncs": 0,
+      "preamble_packets": 0,
+      "filter_cpu_s": 0.339174,
+      "decode_cpu_s": 3.34497,
+      "gpu_s": 1.01683,
+      "capture_s": 4.194304,
+      "epoch": 40
+    },
+    {
+      "type": "status",
+      "samples": 671088640,
+      "packets": 1400,
+      "lost_samples": 0,
+      "resets": 40,
+      "lag_ms": 0.0,
+      "elapsed_s": 6.383905,
+      "processing_s": 4.933798,
+      "capacity_msps": 136.019,
+      "source_alive": false,
+      "backend": "metal",
+      "demodulator": "preamble",
+      "recovery_attempts": 37360,
+      "recovered_packets": 160,
+      "preamble_candidates": 84160,
+      "preamble_syncs": 63600,
+      "preamble_packets": 40,
+      "filter_cpu_s": 0.325793,
+      "decode_cpu_s": 4.222644,
+      "gpu_s": 1.087716,
+      "capture_s": 4.194304,
+      "epoch": 40
+    }
+  ],
+  "deployment": "opt-in; default and running viewer remain adaptive",
+  "limitations": [
+    "Preamble-only acquisition loses packets; hard acquisition retained.",
+    "No demonstrated improvement below -50 dBFS in these captures.",
+    "Full-band preamble mode does not meet the 160 Msps real-time target on this development benchmark."
+  ]
+}

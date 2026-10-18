@@ -1,0 +1,215 @@
+{
+  "implementation": "Forward-only streaming decoder with preamble acquisition and a forward exact-AA fallback; no IQ replay.",
+  "source_sha256": "2cbe0cafec18200e08c84eb95ffe6189dec9cfd3b71613a4a29eb4075c309226",
+  "original": {
+    "baseline": 544,
+    "candidate": 494,
+    "matched": 488,
+    "binary_sha256": "c587e4913b27b7eccdd4e748a05737459671ac501bebe4c4653d5d24791edc24",
+    "modes": {
+      "baseline": "adaptive",
+      "candidate": "streaming"
+    },
+    "lost": 56,
+    "added": 6,
+    "seconds": 3.3554432,
+    "decode_cpu_s": {
+      "adaptive": 6.863497,
+      "streaming": 8.363668
+    },
+    "added_by_context": {
+      "advertising": 4,
+      "connection_request": 0,
+      "repeated_crc_seed": 2
+    },
+    "added_below_minus50_dbfs": 0,
+    "weakest_added_dbfs": -35.26
+  },
+  "holdout": {
+    "baseline": 134,
+    "candidate": 124,
+    "matched": 123,
+    "binary_sha256": "c587e4913b27b7eccdd4e748a05737459671ac501bebe4c4653d5d24791edc24",
+    "modes": {
+      "baseline": "adaptive",
+      "candidate": "streaming"
+    },
+    "lost": 11,
+    "added": 1,
+    "seconds": 0.8388608,
+    "decode_cpu_s": {
+      "adaptive": 0.628385,
+      "streaming": 0.740969
+    },
+    "added_by_context": {
+      "advertising": 1,
+      "connection_request": 0,
+      "repeated_crc_seed": 0
+    },
+    "added_below_minus50_dbfs": 0,
+    "weakest_added_dbfs": -16.02
+  },
+  "combined": {
+    "baseline": 678,
+    "candidate": 618,
+    "matched": 611,
+    "lost": 67,
+    "added": 7
+  },
+  "synthetic": {
+    "noisy_advertisements": {
+      "received": 73,
+      "trials": 144
+    },
+    "noisy_known_connection": {
+      "received": 7,
+      "trials": 20
+    },
+    "clean_cfo_timing": {
+      "received": 24,
+      "trials": 24
+    },
+    "maximum_length_clock_skew": {
+      "received": 3,
+      "trials": 3
+    }
+  },
+  "throughput": {
+    "fixture": "capture-002.raw, IQ8, Metal, 40 repeats per run (4.194304 seconds of RF)",
+    "order": [
+      "adaptive",
+      "streaming",
+      "streaming",
+      "adaptive"
+    ],
+    "median": {
+      "adaptive": {
+        "capacity_msps": 207.39350000000002,
+        "decode_cpu_s": 2.9807435,
+        "processing_s": 3.2359825,
+        "packets": 1400.0
+      },
+      "streaming": {
+        "capacity_msps": 165.811,
+        "decode_cpu_s": 3.8014245,
+        "processing_s": 4.0473505,
+        "packets": 1280.0
+      }
+    },
+    "runs": [
+      {
+        "type": "status",
+        "samples": 671088640,
+        "packets": 1400,
+        "lost_samples": 0,
+        "resets": 40,
+        "lag_ms": 0.0,
+        "elapsed_s": 4.516831,
+        "processing_s": 3.258718,
+        "capacity_msps": 205.936,
+        "source_alive": false,
+        "backend": "metal",
+        "demodulator": "adaptive",
+        "recovery_attempts": 760,
+        "recovered_packets": 160,
+        "preamble_candidates": 0,
+        "preamble_syncs": 0,
+        "preamble_packets": 0,
+        "filter_cpu_s": 0.186772,
+        "decode_cpu_s": 3.000626,
+        "gpu_s": 0.689622,
+        "capture_s": 4.194304,
+        "epoch": 40
+      },
+      {
+        "type": "status",
+        "samples": 671088640,
+        "packets": 1280,
+        "lost_samples": 0,
+        "resets": 40,
+        "lag_ms": 0.0,
+        "elapsed_s": 5.212642,
+        "processing_s": 4.03513,
+        "capacity_msps": 166.312,
+        "source_alive": false,
+        "backend": "metal",
+        "demodulator": "streaming",
+        "recovery_attempts": 0,
+        "recovered_packets": 0,
+        "preamble_candidates": 33200,
+        "preamble_syncs": 183000,
+        "preamble_packets": 40,
+        "filter_cpu_s": 0.181543,
+        "decode_cpu_s": 3.788958,
+        "gpu_s": 0.668701,
+        "capture_s": 4.194304,
+        "epoch": 40
+      },
+      {
+        "type": "status",
+        "samples": 671088640,
+        "packets": 1280,
+        "lost_samples": 0,
+        "resets": 40,
+        "lag_ms": 0.0,
+        "elapsed_s": 5.238346,
+        "processing_s": 4.059571,
+        "capacity_msps": 165.31,
+        "source_alive": false,
+        "backend": "metal",
+        "demodulator": "streaming",
+        "recovery_attempts": 0,
+        "recovered_packets": 0,
+        "preamble_candidates": 33200,
+        "preamble_syncs": 183000,
+        "preamble_packets": 40,
+        "filter_cpu_s": 0.179991,
+        "decode_cpu_s": 3.813891,
+        "gpu_s": 0.657873,
+        "capture_s": 4.194304,
+        "epoch": 40
+      },
+      {
+        "type": "status",
+        "samples": 671088640,
+        "packets": 1400,
+        "lost_samples": 0,
+        "resets": 40,
+        "lag_ms": 0.0,
+        "elapsed_s": 4.405673,
+        "processing_s": 3.213247,
+        "capacity_msps": 208.851,
+        "source_alive": false,
+        "backend": "metal",
+        "demodulator": "adaptive",
+        "recovery_attempts": 760,
+        "recovered_packets": 160,
+        "preamble_candidates": 0,
+        "preamble_syncs": 0,
+        "preamble_packets": 0,
+        "filter_cpu_s": 0.182993,
+        "decode_cpu_s": 2.960861,
+        "gpu_s": 0.697534,
+        "capture_s": 4.194304,
+        "epoch": 40
+      }
+    ],
+    "conditions": "Same Mac with existing live receiver running. Other system load is uncontrolled. Counters report elapsed processing time, not isolated thread CPU time; file I/O and IQ quantization are outside capacity_msps."
+  },
+  "validation": [
+    "check-streaming passed",
+    "check-demod passed",
+    "40 simultaneous channels with CPU/Metal and chunk boundary passed",
+    "viewer streaming tests passed",
+    "ASan/UBSan passed"
+  ],
+  "deployment": "Opt-in --demod streaming. Default and existing live viewer remain adaptive; no router or running receiver changes.",
+  "limitations": [
+    "67 baseline packets were lost; all needed adaptive recovery. Seven other packets were added.",
+    "About 20% lower replay processing capacity and 28% longer decoder time than adaptive in the final paired benchmark.",
+    "Eight fixed timing hypotheses; no symbol-clock tracking loop.",
+    "The short preamble and power gate can miss damaged or weak preambles."
+  ],
+  "historical": true,
+  "superseded_by": "streaming-results.json"
+}

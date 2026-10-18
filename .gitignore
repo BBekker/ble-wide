@@ -1,0 +1,15 @@
+**/build/
+**/node_modules/
+__pycache__/
+*.py[cod]
+.venv*/
+.DS_Store
+/captures/
+/local-data/
+*.raw
+*.cf32
+*.iq16
+*.profraw
+*.profdata
+*.pem
+*.key

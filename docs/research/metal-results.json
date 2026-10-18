@@ -1,0 +1,123 @@
+{
+  "date": "2026-10-15",
+  "device": "Apple M3 Pro",
+  "sample_rate": 160000000,
+  "wire_format": "IQ81, two UDP ports",
+  "live_cpu": {
+    "label": "cpu-before",
+    "seconds": 30.123768625082448,
+    "cpu_percent": {
+      "w1700k-stream": 62.57517190032006,
+      "w1700k-ble-wide": 259.33010232641857
+    },
+    "status_delta": {
+      "samples": 4961767424,
+      "packets": 4528,
+      "lost_samples": 0,
+      "resets": 0,
+      "lag_ms": 0.0,
+      "elapsed_s": 31.011322000000007,
+      "processing_s": 18.810333000000014,
+      "capacity_msps": 0.5929999999999893
+    },
+    "end_status": {
+      "type": "status",
+      "samples": 81313337344,
+      "packets": 104563,
+      "lost_samples": 2039533568,
+      "resets": 23138,
+      "lag_ms": 0.0,
+      "elapsed_s": 532.497793,
+      "processing_s": 319.752583,
+      "capacity_msps": 254.301,
+      "source_alive": true
+    }
+  },
+  "live_metal": {
+    "label": "metal-after",
+    "seconds": 60.09473633416928,
+    "cpu_percent": {
+      "w1700k-stream": 52.81660580637733,
+      "w1700k-ble-wide": 65.94587549170554
+    },
+    "status_delta": {
+      "samples": 9606135808,
+      "packets": 8243,
+      "lost_samples": 0,
+      "resets": 0,
+      "lag_ms": 0.0,
+      "elapsed_s": 60.035349999999994,
+      "processing_s": 34.355337,
+      "capacity_msps": 2.959000000000003,
+      "filter_cpu_s": 4.256508,
+      "decode_cpu_s": 25.631368,
+      "gpu_s": 17.833244999999998
+    },
+    "end_status": {
+      "type": "status",
+      "samples": 12077500416,
+      "packets": 10376,
+      "lost_samples": 0,
+      "resets": 1,
+      "lag_ms": 0.0,
+      "elapsed_s": 87.049011,
+      "processing_s": 43.313412,
+      "capacity_msps": 278.84,
+      "source_alive": true,
+      "backend": "metal",
+      "filter_cpu_s": 5.368749,
+      "decode_cpu_s": 32.250246,
+      "gpu_s": 22.297562
+    }
+  },
+  "ble_cpu_reduction_percent": 74.57068234651004,
+  "receiver_and_decoder_cpu_reduction_percent": 63.10638849165584,
+  "paired_recording": {
+    "samples": 160000000,
+    "input_gaps": 0,
+    "same_packet_channel_position_aa_pdu": true,
+    "cpu": {
+      "type": "status",
+      "samples": 160000000,
+      "packets": 243,
+      "lost_samples": 0,
+      "resets": 1,
+      "lag_ms": 0.0,
+      "elapsed_s": 0.959286,
+      "processing_s": 0.821473,
+      "capacity_msps": 194.772,
+      "source_alive": false,
+      "backend": "cpu",
+      "filter_cpu_s": 2.406085,
+      "decode_cpu_s": 0.579197,
+      "gpu_s": 0.0
+    },
+    "metal": {
+      "type": "status",
+      "samples": 160000000,
+      "packets": 243,
+      "lost_samples": 0,
+      "resets": 1,
+      "lag_ms": 0.0,
+      "elapsed_s": 1.363039,
+      "processing_s": 0.653894,
+      "capacity_msps": 244.688,
+      "source_alive": false,
+      "backend": "metal",
+      "filter_cpu_s": 0.091288,
+      "decode_cpu_s": 0.445134,
+      "gpu_s": 0.274146
+    }
+  },
+  "validation": {
+    "max_complex_component_error": 9.15527344e-05,
+    "all_40_synthetic_channels_and_gpu_seam": "pass"
+  },
+  "limits": [
+    "CPU percent is accumulated process CPU time divided by elapsed wall time; 100% means one core.",
+    "Live intervals were sequential, with different ambient traffic; packet counts are not a sensitivity comparison.",
+    "Zero lost samples in this 60-second GPU interval is not a guarantee of future lossless capture.",
+    "GPU command elapsed time is not device-wide utilization, energy or battery consumption.",
+    "Sample reception, demodulation, CRC/context handling and web serving remain on CPU."
+  ]
+}

@@ -1,0 +1,144 @@
+{
+  "date": "2026-10-17",
+  "machine": "Apple M3 Pro, 11 CPU cores",
+  "baseline": "Streaming decoder after pipeline buffer reuse, direct planar GPU output and synchronization reuse optimizations",
+  "mode": "streaming / Metal / planar / four decoder workers / IQ8",
+  "changes": [
+    "ARM NEON four-sample I/Q differential products and double-precision energy in 64-sample batches",
+    "ARM NEON double-precision FMA synchronization fits across two timing phases per vector",
+    "Apple Accelerate vDSP_svesq for contiguous waterfall display power"
+  ],
+  "precision": {
+    "frontend": "ARM vector differential products match scalar fused multiply-add order; double-precision energy preserved; 10000 randomized arithmetic cases plus silence and scalar tails passed",
+    "synchronization": "Same nine timing phases, same sample order per phase, same thresholds and single payload decode",
+    "waterfall": "Float vector sum with changed summation order only for display power; tested within 0.0001 dB of scalar double result; packet RSSI/noise unchanged"
+  },
+  "benchmark": {
+    "capture": "tools/iq4/build/precision/capture-002.raw",
+    "repetitions_per_run": 20,
+    "trials_per_version": 3,
+    "samples_per_run": 335544320,
+    "median": {
+      "before": {
+        "decode_cpu_s": 2.732144,
+        "filter_cpu_s": 0.107019,
+        "gpu_s": 0.441215,
+        "capacity_msps": 270.435
+      },
+      "after": {
+        "decode_cpu_s": 2.359492,
+        "filter_cpu_s": 0.103479,
+        "gpu_s": 0.417723,
+        "capacity_msps": 335.252
+      }
+    },
+    "runs": [
+      {
+        "version": "before",
+        "trial": 0,
+        "decode_cpu_s": 2.816617,
+        "filter_cpu_s": 0.107019,
+        "gpu_s": 0.441215,
+        "capacity_msps": 259.583
+      },
+      {
+        "version": "after",
+        "trial": 0,
+        "decode_cpu_s": 2.320177,
+        "filter_cpu_s": 0.10105,
+        "gpu_s": 0.390996,
+        "capacity_msps": 340.696
+      },
+      {
+        "version": "after",
+        "trial": 1,
+        "decode_cpu_s": 2.359492,
+        "filter_cpu_s": 0.103479,
+        "gpu_s": 0.43319,
+        "capacity_msps": 335.252
+      },
+      {
+        "version": "before",
+        "trial": 1,
+        "decode_cpu_s": 2.659228,
+        "filter_cpu_s": 0.098091,
+        "gpu_s": 0.448319,
+        "capacity_msps": 283.296
+      },
+      {
+        "version": "before",
+        "trial": 2,
+        "decode_cpu_s": 2.732144,
+        "filter_cpu_s": 0.10773,
+        "gpu_s": 0.418456,
+        "capacity_msps": 270.435
+      },
+      {
+        "version": "after",
+        "trial": 2,
+        "decode_cpu_s": 2.611921,
+        "filter_cpu_s": 0.118271,
+        "gpu_s": 0.417723,
+        "capacity_msps": 285.583
+      }
+    ],
+    "limitations": "Live receiver running concurrently; short replay capacity and decoder CPU measurements, not whole-system CPU or battery use. GPU code unchanged; timing variation is not a GPU optimization."
+  },
+  "capture_regression": {
+    "captures": 40,
+    "valid_before": 895,
+    "valid_after": 895,
+    "events_before": 1434,
+    "events_after": 1434,
+    "lost": 0,
+    "added": 0
+  },
+  "connections": [
+    {
+      "dataset": "old",
+      "before": 49,
+      "after": 49,
+      "exact_match": true
+    },
+    {
+      "dataset": "fresh",
+      "before": 64,
+      "after": 64,
+      "exact_match": true
+    }
+  ],
+  "tests": [
+    "check-streaming-vector",
+    "check-streaming",
+    "check-reply-sync",
+    "check-packet-noise",
+    "check-decode-pool",
+    "check-waterfall",
+    "tests/test_ble_wide.py"
+  ],
+  "binary_verification": [
+    "vDSP_svesq imported from Accelerate",
+    "NEON ld2.4s, fmla.4s and fmla.2d in native executable"
+  ],
+  "artifacts": "build/vector (local outputs, baseline binary, captures, benchmark and disassembly)",
+  "live_verification": {
+    "interval": {
+      "samples": 4808015872,
+      "packets": 3798,
+      "lost_samples": 0,
+      "resets": 0,
+      "elapsed_s": 30.050424000000003,
+      "filter_cpu_s": 1.109335,
+      "decode_cpu_s": 27.642607999999996,
+      "gpu_s": 6.0010840000000005
+    },
+    "final": {
+      "source_alive": true,
+      "demodulator": "streaming",
+      "backend": "metal",
+      "decode_threads": 4,
+      "lag_ms": 0.0,
+      "capacity_msps": 414.499
+    }
+  }
+}

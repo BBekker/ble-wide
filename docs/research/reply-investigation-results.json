@@ -1,0 +1,83 @@
+{
+  "date": "2026-10-17",
+  "changes": [
+    "Amplitude-weighted synchronization for established data addresses; advertising and blind address acquisition unchanged. One payload decode, CRC not used to choose timing.",
+    "Noise learning delayed128us, pre-AA exclusion64us, displayed quiet window32us to avoid peripheral leading carrier."
+  ],
+  "saved_connection_captures": {
+    "old": {
+      "before": 47,
+      "after": 49,
+      "lost": [],
+      "added": [
+        {
+          "ch": 2,
+          "sample": 62426,
+          "dbfs": -35.25,
+          "cfo": -24395.1,
+          "crc": "2e45cd",
+          "pdu": "0900",
+          "capture": 0
+        },
+        {
+          "ch": 1,
+          "sample": 673724,
+          "dbfs": -62.12,
+          "cfo": 869.8,
+          "crc": "2e4eb8",
+          "pdu": "0500",
+          "capture": 3
+        }
+      ]
+    },
+    "fresh": {
+      "before": 63,
+      "after": 64,
+      "lost": [],
+      "added": [
+        {
+          "ch": 10,
+          "sample": 559873,
+          "dbfs": -49.57,
+          "cfo": 10970.6,
+          "crc": "d582a9",
+          "pdu": "0900",
+          "capture": 1
+        }
+      ]
+    }
+  },
+  "regression_recordings": {
+    "count": 40,
+    "before": 894,
+    "after": 895,
+    "lost": 0
+  },
+  "synthetic": {
+    "cases": 1200,
+    "added": 3,
+    "lost": 0,
+    "coverage": "frequency offsets -100..100kHz, fractional timings, 0/6/12/18dB AA gain steps, 6/10/14dB SNR"
+  },
+  "noise_example": {
+    "capture": "missing-reply-fresh/capture-1",
+    "channel": 19,
+    "sample": 364873,
+    "before_dbfs": -48.3,
+    "corrected_dbfs": -57.07,
+    "independent_quiet_power_dbfs": -57
+  },
+  "ruled_out_or_rejected": {
+    "channelizer": "Independent direct mixer/FIR matches GPU output within0.002ADCunits.",
+    "wider_filter": "800kHz adds2 but loses1 with weighted synchronization; kept650kHz for alias rejection.",
+    "payload_weights": "Regressed captures; unchanged.",
+    "fixed_gain": "LNA2/LPF5 and LNA4/LPF9 did not resolve channel-dependent missing replies. RestoredAGC. Sequential trials included reconnections, so not a controlled sensitivity comparison.",
+    "carrier_cfo": "Did not improve saved reply recovery."
+  },
+  "limits": [
+    "Still only11of38 and22of42 expected replies recovered in the two saved sets.",
+    "Decoded RSSI does not measure synchronization quality or calibrated SNR.",
+    "Background can include unrecognized transmissions; receiver gain can differ between quiet window and payload."
+  ],
+  "artifacts": "build/combined-review; build/decoder-review; build/rf-review; build/pipeline-review; build/gain-review"
+}
