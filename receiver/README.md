@@ -156,6 +156,6 @@ CPU accounting and must not be added to the process columns. Other applications
 also contribute to system totals. Compare repeated runs at the same traffic
 rate; receiver CPU alone excludes substantial Ethernet driver/kernel work.
 
-Measured results and limitations are in [udp-efficiency-results.json](udp-efficiency-results.json).
+Measured results and limitations are in [UDP benchmark results](../docs/benchmarks/udp-efficiency.json).
 These changes retain the existing 8224-byte UDP payloads and wire packet rate;
 they do not alter USB aggregation, NIC interrupt moderation, or sample precision.

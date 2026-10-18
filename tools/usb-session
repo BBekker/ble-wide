@@ -32,7 +32,7 @@ def main():
             p.error('a session record already exists; use status/run, or stop before starting another')
         subprocess.run([str(ROOT/'tools/run'),'make','-C','receiver','usb-helper'],check=True)
         stage=Path(tempfile.mkdtemp(prefix='ble-usb-',dir='/tmp'))
-        shutil.copy2(ROOT/'receiver/usb/test-session.py',stage/'test-session.py')
+        shutil.copy2(ROOT/'tools/usb/test-session.py',stage/'test-session.py')
         shutil.copytree(ROOT/'receiver/build/BLEUSBHelper.app',stage/'BLEUSBHelper.app')
         path=stage/'control.sock'
         cmd=shlex.join([sys.executable,'-I',str(stage/'test-session.py'),'--socket',str(path),'--uid',str(os.getuid())])
@@ -49,9 +49,9 @@ def main():
     if not state:p.error('no session')
     if a.action=='run':
         # Forward timeout/log flags and the helper argument separator unchanged.
-        raise SystemExit(subprocess.call([sys.executable,str(ROOT/'receiver/usb/session-client.py'),*a.arguments]))
+        raise SystemExit(subprocess.call([sys.executable,str(ROOT/'tools/usb/session-client.py'),*a.arguments]))
     if ready:
-        subprocess.run([sys.executable,str(ROOT/'receiver/usb/session-client.py'),'--stop'],check=True)
+        subprocess.run([sys.executable,str(ROOT/'tools/usb/session-client.py'),'--stop'],check=True)
     elif state.get('launcher_pid'):
         pid=state['launcher_pid']
         command=subprocess.run(['ps','-p',str(pid),'-o','command='],capture_output=True,text=True).stdout
