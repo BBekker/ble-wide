@@ -1,6 +1,6 @@
 # Direct RTL8157 USB input (experimental)
 
-This path replaces the Realtek Ethernet driver during a bounded capture. It bypasses macOS Ethernet/IP/UDP receive handling; Apple's USB host controller, DMA machinery, and USB completions still run. It is **not yet a validated replacement for the live UDP receiver**.
+This path replaces the Realtek Ethernet driver during a bounded capture. It bypasses macOS Ethernet/IP/UDP receive handling; Apple's USB host controller, DMA machinery, and USB completions still run. Live 160 Msps IQ8 reception and BLE decoding have been demonstrated on an M3 Pro with an RTL8157. Long-running operation and router control during takeover remain unfinished; the UDP receiver is still the default.
 
 ## Architecture
 
@@ -46,9 +46,9 @@ sudo ./receiver/build/BLEUSBHelper.app/Contents/MacOS/rtl8157-helper \
   --receive --seconds 15 --ring /tmp/ble-usb-example.ring --uid "$(id -u)"
 ```
 
-Attach a decoder to `/ble-usb-test` as an ordinary user. `--probe` only captures the device and reads diagnostic registers. `--passive` receives without the volatile warm-enable sequence. `--location 0x...` selects a specific adapter when multiple RTL8157 devices are present. All capture modes temporarily take the adapter away from its normal driver. On termination, outstanding transfers are canceled/drained and the device is released for driver rematching. A stuck test is bounded by the development test supervisor; terminating the helper also closes its USB user client.
+Attach a decoder to `/ble-usb-test` as an ordinary user. `--probe` only captures the device and reads diagnostic registers. `--passive` receives without the volatile warm-enable sequence; it timed out after stock-driver shutdown on the tested adapter. `--location 0x...` selects a specific adapter when multiple RTL8157 devices are present. All capture modes temporarily take the adapter away from its normal driver. On termination, outstanding transfers are canceled/drained and the device is released for driver rematching. A stuck test is bounded by the development test supervisor; terminating the helper also closes its USB user client.
 
-The experimental warm-enable sequence sets a 9216-byte frame limit, a receive aggregation threshold that fits a 32 KiB transfer, and an 85 microsecond aggregation timer. Those are initial settings to validate, not benchmarked optimal values.
+The warm-enable sequence leaves the adapter's out-of-band wake mode, sets a 9216-byte frame limit, a receive aggregation threshold that fits a 64 KiB transfer, and an 85 microsecond aggregation timer. All 32 DMA buffers are allocated and queued before receive is ungated. `--aggregate-kib 32` selects the smaller comparison setting; 64 is the tested default. With the current 8224-byte UDP payload, the larger setting usually aggregates seven Ethernet frames into a 58,016-byte USB completion.
 
 ## Development session: one authentication
 
@@ -73,8 +73,27 @@ Keep executable staging and ring files outside macOS's protected Documents direc
 - Parser tests cover jumbo/two-record datagrams, VLANs, IP options, checksum failures, fragments, truncation and randomized malformed transfers.
 - Ring tests cover capacity, backpressure, wraparound and cross-process producer exclusion.
 - With SIP enabled, device capture succeeded using `DeviceCapture | DeviceSeize`, followed by normal-driver recovery.
-- Initial control reads using ordinary `NSMutableData` returned `kIOReturnNotReady`. The current helper uses IOUSBHost-allocated DMA/control buffers and opens the vendor interface; that change still needs a live test.
-- Sustained live USB throughput, loss and total-system CPU savings are unverified. The regular UDP receiver remains the default.
+- Initial control reads using ordinary `NSMutableData` returned `kIOReturnNotReady`. IOUSBHost-allocated control buffers plus an opened vendor interface successfully read and write the registers.
+- Register access alone was insufficient: both native IOUSBHost and a separate libusb bulk-read probe timed out after capture. The stock driver had left `NOW_IS_OOB`, `MCU_BORW_EN`, and MCU speed-down enabled. Leaving that state using the corresponding `rtl8156_up` operations made bulk reception work without PHY reinitialization or firmware upload.
+- Live hardware measurements and remaining limits are recorded below. The regular UDP receiver remains the default.
+
+### Hardware measurements, 2026-10-17
+
+M3 Pro, RTL8157 revision `0x3000`, existing 5 Gb/s link, 160 Msps IQ8 export, two records per jumbo UDP datagram, Metal channelizer and four streaming decode workers. These are short sequential measurements on a running desktop, not an isolated CPU benchmark. BLE traffic changes between runs.
+
+| Receive path | USB data rate | USB completions/s | Helper CPU, one core = 100% | Receiver CPU, one core = 100% | Whole-machine system CPU |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Stock driver + UDP | — | — | — | 38.2% | 19.40% |
+| Direct USB, 32 KiB aggregation | 2.580 Gb/s | 12,999 | 38.0% | 11.4% | 8.54% |
+| Direct USB, 64 KiB aggregation | 2.590 Gb/s | 5,618 | 18.3% | 11.4% | 6.19% |
+
+The two USB captures lasted 20 seconds each. Rates include USB descriptors, Ethernet/IP/UDP headers and Ethernet FCS. They correspond to the 2.56 Gb/s IQ8 sample stream, not a 5 Gb/s saturation test. Helper CPU uses `getrusage`; receiver CPU uses process CPU-time differences. System CPU uses `HOST_CPU_LOAD_INFO` deltas over steady portions of each capture. The stock Realtek process also consumed approximately 38.2% of one core. Whole-machine busy CPU was 36.17%, 21.41%, and 19.31% respectively; unrelated desktop activity and different BLE packets prevent attributing every difference to this change.
+
+Both 20-second USB captures had zero USB errors, timeouts, ring drops, malformed network frames and receiver overruns. Sample loss was nonzero at capture startup (6,093 slices with 32 KiB; 1,262 with 64 KiB), then remained unchanged in every subsequent one-second report. Do not describe these captures as globally lossless. The 64 KiB run delivered 781,508 valid IQ UDP datagrams to the receiver and 2,547 BLE packet records, including CRC failures, to the decoder output.
+
+The final build, which queues DMA requests before ungating receive, passed a further 30-second capture: 2.589 Gb/s, 168,563 USB completions, 1,172,061 IQ datagrams, 3,337 CRC-valid BLE packets and 777 CRC-failed packet records. Helper CPU was 18.0% of one core. There were zero USB errors/timeouts, ring drops, malformed frames or receiver overruns. The initial 801 missing sample slices (1,640,448 samples, about 10.25 ms) did not increase during the remaining capture. This shorter startup gap is an observation from one run, not proof that startup loss is solved. Synthetic IQ8 and unaligned packed-14 integration tests also passed with the real receiver executable.
+
+The normal adapter recovered its 5 Gb/s link, address and MTU after each capture. SSH is unavailable during takeover, so the current router launcher cannot supervise an indefinite direct-USB session. This implementation also relies on the stock driver having initialized the adapter before takeover. It does not claim cold-start support, long-duration stability, or removal of USB kernel processing.
 
 ## Sources and licensing
 

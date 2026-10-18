@@ -18,6 +18,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <sys/resource.h>
 
 static volatile sig_atomic_t stopping = 0;
 static void stop_signal(int) { stopping = 1; }
@@ -39,7 +40,7 @@ class Adapter {
     dispatch_group_t pending_=dispatch_group_create();
     bool running_=false;
     usb_rx::TransferRing *ring_=nullptr;
-    uint64_t transfers_=0, bytes_=0, errors_=0;
+    uint64_t transfers_=0, bytes_=0, errors_=0, completions_=0, timeouts_=0;
     std::atomic<bool> failed_{false};
 public:
     ~Adapter() {
@@ -112,35 +113,44 @@ public:
         write(space,address,width,(old&~clear)|set);
     }
     void diagnose() {
-        for(uint16_t address : {0xc000,0xc004,0xc010,0xc014,0xc0b4,0xe610,0xe810,0xe858,0xe908})
+        for(uint16_t address : {0xc000,0xc004,0xc010,0xc014,0xc0a0,0xc0a4,0xc0a8,0xc0b4,0xe0cc,0xe610,0xe810,0xe84c,0xe858,0xe8dc,0xe908})
             printf("PLA[%04x]=%08x\n",address,read(0x100,address));
-        for(uint16_t address : {0xd404,0xd42c,0xd430,0xd434,0xd4ec})
+        for(uint16_t address : {0xd404,0xd40c,0xd42c,0xd430,0xd434,0xd4b0,0xd4ec})
             printf("USB[%04x]=%08x\n",address,read(0,address));
     }
-    void warm_enable() {
+    void warm_enable(unsigned aggregate_kib) {
         // This is deliberately not a cold PHY/firmware loader. Keep the existing
         // calibration/link; refuse to guess when the stock driver left it down.
         const uint16_t speed=field(0x100,0xe908,2);
         if(!(speed&2))throw std::runtime_error("PHY link is down after capture; cold initialization is not implemented");
         printf("PHY status=%04x speed=%u Mb/s\n",speed,(speed&0x1000)?5000:(speed&0x400)?2500:0);
         modify(0x100,0xe85a,2,0,8); // gate RX while configuring aggregation
+        // Driver termination may leave the NIC receiving into the out-of-band
+        // wake engine instead of the host DMA engine (rtl8156_up).
+        modify(0x100,0xe84f,1,0x80,0); // NOW_IS_OOB
+        modify(0x100,0xc012,2,8,0);
+        modify(0x100,0xe8de,2,0x4000,0); // MCU_BORW_EN
+        modify(0x100,0xe0cc,2,0x4000,0); // PLA_MCU_SPDWN_EN
         write(0x100,0xc016,2,9216); // receive maximum frame size
         modify(0,0xd406,2,0x10,0); // enable receive aggregation
         modify(0,0xd4ee,2,0x1ff,0);
         write(0,0xd42c,2,80); // 640 ns early timeout, as in rtl8156_enable
-        write(0,0xd42e,2,(32768-9216-16-16)/16); // RTL8157 uses 16-byte units
+        write(0,0xd42e,2,(aggregate_kib*1024-9216-16-16)/16); // RTL8157 uses 16-byte units
         write(0,0xd432,2,85000/8); // 85 us aggregation timer
         modify(0x100,0xc0b4,2,1,0); // reset packet filter
         modify(0x100,0xc0b4,2,0,1);
         modify(0x100,0xc010,4,0x0f,0x0a); // physical MAC and broadcast only
         modify(0x100,0xe813,1,0,0x0c); // RX/TX enable
         write(0,0xd437,1,3); // publish RX DMA ownership change
-        modify(0x100,0xe85a,2,8,0); // ungate RX
+        // Keep RX gated until the host has queued its DMA buffers.
     }
     void submit(NSMutableData *buffer) {
         NSError *e=nil;dispatch_group_enter(pending_);
         bool ok=[input_ enqueueIORequestWithData:buffer completionTimeout:1 error:&e
             completionHandler:^(IOReturn status, NSUInteger n) {
+                ++completions_;
+                if(status==kIOReturnTimeout)++timeouts_;
+                if(completions_==1)printf("First USB completion: status=0x%08x bytes=%zu\n",status,(size_t)n);
                 if(status==kIOReturnSuccess && n) {
                     ++transfers_;bytes_+=n;
                     if(ring_) {
@@ -164,22 +174,31 @@ public:
             fprintf(stderr,"USB input submission: %s\n",e.description.UTF8String);
         }
     }
-    void receive(unsigned seconds,usb_rx::TransferRing *ring,bool passive) {
+    void receive(unsigned seconds,usb_rx::TransferRing *ring,bool passive,unsigned aggregate_kib) {
         ring_=ring;
-        if(!passive)warm_enable();
         for(unsigned k=0;k<32;++k) {
             NSError *e=nil;NSMutableData *b=[interface_ ioDataWithCapacity:usb_rx::slot_bytes error:&e];
             require(b!=nil,e,"allocate USB DMA buffer");[buffers_ addObject:b];
+            if(k==0)printf("USB DMA buffer length=%zu\n",(size_t)b.length);
         }
+        if(!passive)warm_enable(aggregate_kib);
         if(ring_) {usb_rx::release(ring_->header->pid,getpid());usb_rx::release(ring_->header->state,1);}
+        rusage before{},after{};getrusage(RUSAGE_SELF,&before);
         dispatch_sync(queue_,^{running_=true;for(NSMutableData *b in buffers_)submit(b);});
+        if(!passive)modify(0x100,0xe85a,2,8,0); // ungate RX with all requests ready
         const auto start=std::chrono::steady_clock::now();
         while(!stopping && !failed_ && std::chrono::steady_clock::now()-start<std::chrono::seconds(seconds))usleep(10000);
         stop();
+        getrusage(RUSAGE_SELF,&after);
+        printf("USB completions=%llu timeouts=%llu\n",(unsigned long long)completions_,(unsigned long long)timeouts_);
+        diagnose();
         const double elapsed=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();
-        printf("{\"seconds\":%.6f,\"usb_transfers\":%llu,\"usb_bytes\":%llu,\"mbps\":%.3f,\"errors\":%llu,\"ring_drops\":%llu}\n",
+        const auto cpu_seconds=[](const timeval &v){return double(v.tv_sec)+v.tv_usec/1e6;};
+        const double cpu=cpu_seconds(after.ru_utime)+cpu_seconds(after.ru_stime)-cpu_seconds(before.ru_utime)-cpu_seconds(before.ru_stime);
+        printf("{\"seconds\":%.6f,\"usb_transfers\":%llu,\"usb_bytes\":%llu,\"mbps\":%.3f,\"errors\":%llu,\"ring_drops\":%llu,\"timeouts\":%llu,\"cpu_seconds\":%.6f,\"aggregate_kib\":%u}\n",
             elapsed,(unsigned long long)transfers_,(unsigned long long)bytes_,bytes_*8/elapsed/1e6,
-            (unsigned long long)errors_,(unsigned long long)(ring_?usb_rx::acquire(ring_->header->dropped):0));
+            (unsigned long long)errors_,(unsigned long long)(ring_?usb_rx::acquire(ring_->header->dropped):0),
+            (unsigned long long)timeouts_,cpu,aggregate_kib);
         if(failed_)throw std::runtime_error("USB receive failed");
         if(!transfers_)throw std::runtime_error("no USB frames received during capture");
     }
@@ -198,7 +217,7 @@ public:
 int main(int argc,char **argv) {
     try { @autoreleasepool { @try {
         setbuf(stdout,nullptr);signal(SIGINT,stop_signal);signal(SIGTERM,stop_signal);
-        bool receive=false,passive=false;unsigned seconds=10;uint32_t location=0;uid_t uid=0;std::string ring_path;
+        bool receive=false,passive=false;unsigned seconds=10,aggregate_kib=64;uint32_t location=0;uid_t uid=0;std::string ring_path;
         if(const char *u=getenv("BLE_USB_CLIENT_UID"))uid=uid_t(std::stoul(u));
         else if(const char *u=getenv("SUDO_UID"))uid=uid_t(std::stoul(u));
         for(int i=1;i<argc;++i) {
@@ -207,13 +226,15 @@ int main(int argc,char **argv) {
             else if(arg=="--receive")receive=true;
             else if(arg=="--passive")passive=true;
             else if(arg=="--seconds")seconds=std::stoul(value());
+            else if(arg=="--aggregate-kib")aggregate_kib=std::stoul(value());
             else if(arg=="--location")location=std::stoul(value(),nullptr,0);
             else if(arg=="--uid")uid=std::stoul(value());
             else if(arg=="--ring")ring_path=value();
-            else if(arg=="--help") {puts("rtl8157-helper [--probe | --receive] [--seconds N] [--ring PATH --uid N] [--location HEX] [--passive]");return 0;}
+            else if(arg=="--help") {puts("rtl8157-helper [--probe | --receive] [--seconds N] [--ring PATH --uid N] [--location HEX] [--aggregate-kib 32|64] [--passive]");return 0;}
             else throw std::runtime_error("unknown argument: "+arg);
         }
         if(!seconds || seconds>86400)throw std::runtime_error("seconds must be 1..86400");
+        if(aggregate_kib!=32 && aggregate_kib!=64)throw std::runtime_error("aggregate-kib must be 32 or 64");
         if(geteuid())throw std::runtime_error("USB capture requires root; SIP and startup security stay enabled");
         // Ring must outlive Adapter, whose destructor drains callbacks before releasing USB.
         std::unique_ptr<usb_rx::TransferRing> ring;
@@ -222,7 +243,7 @@ int main(int argc,char **argv) {
             ring=std::make_unique<usb_rx::TransferRing>(ring_path,true,uid);
         }
         Adapter adapter;adapter.open(location);adapter.diagnose();
-        if(receive)adapter.receive(seconds,ring.get(),passive);
+        if(receive)adapter.receive(seconds,ring.get(),passive,aggregate_kib);
         puts("Releasing USB adapter to its normal driver.");return 0;
     } @catch(NSException *e) {fprintf(stderr,"USB framework exception: %s\n",e.description.UTF8String);return 1;}
     } } catch(const std::exception &e) {fprintf(stderr,"rtl8157-helper: %s\n",e.what());return 1;}
