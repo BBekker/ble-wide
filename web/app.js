@@ -134,7 +134,7 @@
     for(const id of store.connections.keys())if(!keep.has(id)){store.connections.delete(id);store.byConnection.delete(id);}
     if(store.selected&&!keep.has(store.selected))store.selected=null;
     if(store.autoSelect&&store.connections.size)store.selected=[...store.connections.values()].sort((a,b)=>Number(b.observed)-Number(a.observed)||b.count-a.count||a.start-b.start)[0].id;
-    store.cursor=data.cursor;store.spectrumCursor=data.spectrum_cursor||0;store.status=data.status;store.gaps=data.gaps||[];
+    store.cursor=data.cursor;store.spectrumCursor=data.spectrum_cursor||0;store.status=data.status;store.gaps=data.gaps||[];store.receiver=data.receiver||{};
     store.active=data.active;store.connected=true;store.lastMessage=performance.now();
     store.clock=Math.max(data.capture_s||0,store.spectrum.length?store.spectrum[store.spectrum.length-1].end_s:0);
     store.receivedAt=performance.now();store.revision++;
@@ -151,7 +151,10 @@
     syncNavigation();
     setText('timeline-mode',store.packets.length>=LIMIT?'Latest 50,000 packets':'Individual packets');
     const active=store.active&&store.connected&&performance.now()-store.lastMessage<2000;
-    $('live').className='status'+(active?'':' off');$('live').replaceChildren(node('i'),document.createTextNode(active?'Receiving':store.connected?'Stream stopped':'Reconnecting'));
+    const receiver=store.receiver||{};
+    const starting=['detecting','starting','authorizing'].includes(receiver.phase);
+    $('live').className='status'+(active?'':' off');$('live').replaceChildren(node('i'),document.createTextNode(active?'Receiving':receiver.phase==='authorizing'?'Approval needed':starting?'Starting':store.connected?'Stream stopped':'Reconnecting'));
+    setText('receiver-mode',receiver.message||'Checking receiver');
     setText('processing',store.status.backend==='metal'?'GPU channelizer · Metal':'CPU channelizer');
     setText('packets',number(store.status.packets));setText('packet-rate',number(Math.max(0,Math.round(packetRate)))+' packets / sec');
     setText('connection-total',store.connections.size);
@@ -160,7 +163,7 @@
     const channels=store.status.channels||[];const seen=channels.filter(c=>c.packets>0).length;
     $('seen').replaceChildren(document.createTextNode(seen+' '),node('em','/ 40'));
     const missing=(store.status.lost_samples||0)/160000;
-    setText('health',active?missing?'Gaps detected':'Receiving':store.connected?'Stopped':'Connecting');
+    setText('health',active?missing?'Gaps detected':'Receiving':starting?'Starting':store.connected?'Stopped':'Connecting');
     $('health').style.color=active&&!missing?'#2b8e75':'#a48b65';
     setText('lag',(store.status.lag_ms||0).toFixed(1)+' ms');setText('lost',missing.toFixed(1)+' ms');
     setText('capture-clock',seconds(clockNow())+' / capture');

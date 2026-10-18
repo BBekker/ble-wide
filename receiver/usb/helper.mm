@@ -174,7 +174,7 @@ public:
             fprintf(stderr,"USB input submission: %s\n",e.description.UTF8String);
         }
     }
-    void receive(unsigned seconds,usb_rx::TransferRing *ring,bool passive,unsigned aggregate_kib) {
+    void receive(unsigned seconds,usb_rx::TransferRing *ring,bool passive,unsigned aggregate_kib,bool lease) {
         ring_=ring;
         for(unsigned k=0;k<32;++k) {
             NSError *e=nil;NSMutableData *b=[interface_ ioDataWithCapacity:usb_rx::slot_bytes error:&e];
@@ -187,7 +187,20 @@ public:
         dispatch_sync(queue_,^{running_=true;for(NSMutableData *b in buffers_)submit(b);});
         if(!passive)modify(0x100,0xe85a,2,8,0); // ungate RX with all requests ready
         const auto start=std::chrono::steady_clock::now();
-        while(!stopping && !failed_ && std::chrono::steady_clock::now()-start<std::chrono::seconds(seconds))usleep(10000);
+        auto last_heartbeat=start;
+        uint64_t heartbeat=ring_?usb_rx::acquire(ring_->header->heartbeat):0;
+        while(!stopping && !failed_ && std::chrono::steady_clock::now()-start<std::chrono::seconds(seconds)) {
+            if(lease) {
+                if(usb_rx::acquire(ring_->header->stop_requested))break;
+                const auto now=std::chrono::steady_clock::now();
+                const uint64_t current=usb_rx::acquire(ring_->header->heartbeat);
+                if(current!=heartbeat){heartbeat=current;last_heartbeat=now;}
+                if(now-last_heartbeat>std::chrono::seconds(5)) {
+                    fprintf(stderr,"Viewer heartbeat stopped; releasing USB adapter\n");failed_=true;break;
+                }
+            }
+            usleep(10000);
+        }
         stop();
         getrusage(RUSAGE_SELF,&after);
         printf("USB completions=%llu timeouts=%llu\n",(unsigned long long)completions_,(unsigned long long)timeouts_);
@@ -217,7 +230,7 @@ public:
 int main(int argc,char **argv) {
     try { @autoreleasepool { @try {
         setbuf(stdout,nullptr);signal(SIGINT,stop_signal);signal(SIGTERM,stop_signal);
-        bool receive=false,passive=false;unsigned seconds=10,aggregate_kib=64;uint32_t location=0;uid_t uid=0;std::string ring_path;
+        bool receive=false,passive=false,lease=false;unsigned seconds=10,aggregate_kib=64;uint32_t location=0;uid_t uid=0;std::string ring_path;
         if(const char *u=getenv("BLE_USB_CLIENT_UID"))uid=uid_t(std::stoul(u));
         else if(const char *u=getenv("SUDO_UID"))uid=uid_t(std::stoul(u));
         for(int i=1;i<argc;++i) {
@@ -225,16 +238,18 @@ int main(int argc,char **argv) {
             if(arg=="--probe" || arg=="--capture"){}
             else if(arg=="--receive")receive=true;
             else if(arg=="--passive")passive=true;
+            else if(arg=="--lease")lease=true;
             else if(arg=="--seconds")seconds=std::stoul(value());
             else if(arg=="--aggregate-kib")aggregate_kib=std::stoul(value());
             else if(arg=="--location")location=std::stoul(value(),nullptr,0);
             else if(arg=="--uid")uid=std::stoul(value());
             else if(arg=="--ring")ring_path=value();
-            else if(arg=="--help") {puts("rtl8157-helper [--probe | --receive] [--seconds N] [--ring PATH --uid N] [--location HEX] [--aggregate-kib 32|64] [--passive]");return 0;}
+            else if(arg=="--help") {puts("rtl8157-helper [--probe | --receive] [--seconds N] [--ring PATH --uid N] [--location HEX] [--aggregate-kib 32|64] [--passive] [--lease]");return 0;}
             else throw std::runtime_error("unknown argument: "+arg);
         }
         if(!seconds || seconds>86400)throw std::runtime_error("seconds must be 1..86400");
         if(aggregate_kib!=32 && aggregate_kib!=64)throw std::runtime_error("aggregate-kib must be 32 or 64");
+        if(lease && (!receive || ring_path.empty()))throw std::runtime_error("--lease requires --receive and --ring");
         if(geteuid())throw std::runtime_error("USB capture requires root; SIP and startup security stay enabled");
         // Ring must outlive Adapter, whose destructor drains callbacks before releasing USB.
         std::unique_ptr<usb_rx::TransferRing> ring;
@@ -243,7 +258,7 @@ int main(int argc,char **argv) {
             ring=std::make_unique<usb_rx::TransferRing>(ring_path,true,uid);
         }
         Adapter adapter;adapter.open(location);adapter.diagnose();
-        if(receive)adapter.receive(seconds,ring.get(),passive,aggregate_kib);
+        if(receive)adapter.receive(seconds,ring.get(),passive,aggregate_kib,lease);
         puts("Releasing USB adapter to its normal driver.");return 0;
     } @catch(NSException *e) {fprintf(stderr,"USB framework exception: %s\n",e.description.UTF8String);return 1;}
     } } catch(const std::exception &e) {fprintf(stderr,"rtl8157-helper: %s\n",e.what());return 1;}

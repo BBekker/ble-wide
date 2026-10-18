@@ -29,14 +29,17 @@ Build outputs and locally generated compiler profiles are ignored by Git. A regu
 
 ## Live reception
 
-With the router already exporting to this computer, start the two cooperating processes in separate terminals:
+With the router already exporting to this computer, start the viewer:
 
 ```sh
-./receiver/build/w1700k-stream --bind 10.77.0.10 --ports 2 --name /w1700k-iq4 --report 5
-python3 server.py --stream /w1700k-iq4 --bits 8 --backend metal --decode-threads 4
+python3 server.py --bits 8 --backend metal --decode-threads 4
 ```
 
-Open [the viewer](http://127.0.0.1:8076/). Use `--backend cpu` on Linux. Streaming decoding is the default. The example matches the current 160 Msps, 8-bit export over two UDP ports with jumbo frames; the router exporter and host network must already be configured accordingly. `--bits` describes the source stream to the viewer; the receiver detects the wire format and publishes normalized int16 IQ. It does not configure the router.
+Open [the viewer](http://127.0.0.1:8076/). The viewer starts and stops its sample receiver and decoder. On macOS it detects the adapter owning `--bind` (default `10.77.0.10`) and prefers direct USB for the tested RTL8157 revision `0x3000` in vendor configuration 1. Detection does not require privileges. USB capture uses one macOS administrator authorization per viewer run, with no installed service or security-setting changes. Receiver details show the selected transport and startup/fallback reason. Unsupported hardware uses UDP; a failed or declined USB attempt falls back to UDP without prompting again.
+
+Use `--transport udp` to force ordinary networking or `--transport usb` to require USB and report an error instead of falling back. `--stream /name` explicitly attaches to a receiver managed elsewhere and never claims its adapter. Direct USB temporarily removes normal IP networking on that adapter, so use the updated router launcher below or an independently running exporter.
+
+Use `--backend cpu` on Linux. Streaming decoding is the default. The example matches the current 160 Msps, 8-bit export over two UDP ports with jumbo frames; the router exporter and host network must already be configured accordingly. `--bits` describes the source stream to the viewer; the receiver detects the wire format and publishes normalized int16 IQ. It does not configure the router.
 
 For coordinated router setup/start/stop, run the hardware launcher from the separate SDR checkout:
 
@@ -63,4 +66,4 @@ Historical [research notes and measurements](docs/research/README.md) retain the
 
 Local recordings and older build experiments may be kept under ignored `local-data/`; none are uploaded. See [`NOTICE`](NOTICE) for source provenance and licensing.
 
-Experimental [direct RTL8157 USB input](receiver/usb/README.md) is available as an optional, separately built helper. The UDP receiver remains the tested default.
+The [direct RTL8157 USB helper](receiver/usb/README.md) is built automatically when compatible hardware is detected. Its hardware support is narrow, and the normal UDP path remains available on every supported platform. Shutdown logs are retained in `build/live-receiver/`.

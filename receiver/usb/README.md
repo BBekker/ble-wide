@@ -1,6 +1,16 @@
 # Direct RTL8157 USB input (experimental)
 
-This path replaces the Realtek Ethernet driver during a bounded capture. It bypasses macOS Ethernet/IP/UDP receive handling; Apple's USB host controller, DMA machinery, and USB completions still run. Live 160 Msps IQ8 reception and BLE decoding have been demonstrated on an M3 Pro with an RTL8157. Long-running operation and router control during takeover remain unfinished; the UDP receiver is still the default.
+This path replaces the Realtek Ethernet driver during capture. It bypasses macOS Ethernet/IP/UDP receive handling; Apple's USB host controller, DMA machinery, and USB completions still run. Live 160 Msps IQ8 reception and BLE decoding have been demonstrated on an M3 Pro with an RTL8157. The viewer now prefers this path on the tested adapter; cold initialization and broader hardware support remain unfinished.
+
+## Automatic viewer reception
+
+Run `python3 server.py --backend metal` with the router already exporting. The default `--transport auto` performs read-only IORegistry discovery and matches the tested USB VID/PID/revision (`0bda:8157`, `0x3000`), vendor configuration 1, and active network interface owning `--bind`. It never captures an unrelated adapter just because its chipset matches. Unsupported or ambiguous hardware uses UDP.
+
+The viewer builds and stages the helper, starts its unprivileged sample receiver and decoder, then requests one macOS administrator authorization for the fixed USB executable. Approval is attempted once per viewer run. Declining, failing to receive IQ samples, or losing USB capture releases the adapter and falls back to UDP. `--transport udp` disables takeover; `--transport usb` reports failures without fallback. `--stream /name` attaches to an external receiver and does not auto-select hardware.
+
+The page remains available during authorization and displays the transport and fallback reason under Receiver details. A lightweight `/receiver` endpoint exposes transport state and sample progress for local supervision. The router launcher starts its detached exporter before the viewer and supervises local sample progress, avoiding SSH while USB owns the adapter. It stops the viewer and releases USB before attempting router shutdown over SSH.
+
+The viewer refreshes a shared-ring heartbeat while capture is active. `--lease` tells the helper to release USB if this heartbeat stops for five seconds, including an abrupt viewer exit. Normal shutdown sets an explicit stop request and waits for release. The helper is bounded to 24 hours and performs no permanent installation. Logs are copied to `build/live-receiver/` on shutdown; sample buffers remain temporary. Ordinary IP traffic through this adapter is unavailable during direct capture.
 
 ## Architecture
 
@@ -75,7 +85,7 @@ Keep executable staging and ring files outside macOS's protected Documents direc
 - With SIP enabled, device capture succeeded using `DeviceCapture | DeviceSeize`, followed by normal-driver recovery.
 - Initial control reads using ordinary `NSMutableData` returned `kIOReturnNotReady`. IOUSBHost-allocated control buffers plus an opened vendor interface successfully read and write the registers.
 - Register access alone was insufficient: both native IOUSBHost and a separate libusb bulk-read probe timed out after capture. The stock driver had left `NOW_IS_OOB`, `MCU_BORW_EN`, and MCU speed-down enabled. Leaving that state using the corresponding `rtl8156_up` operations made bulk reception work without PHY reinitialization or firmware upload.
-- Live hardware measurements and remaining limits are recorded below. The regular UDP receiver remains the default.
+- Live hardware measurements and remaining limits are recorded below. UDP is the automatic fallback for unsupported hardware or capture failure.
 
 ### Hardware measurements, 2026-10-17
 
@@ -93,7 +103,7 @@ Both 20-second USB captures had zero USB errors, timeouts, ring drops, malformed
 
 The final build, which queues DMA requests before ungating receive, passed a further 30-second capture: 2.589 Gb/s, 168,563 USB completions, 1,172,061 IQ datagrams, 3,337 CRC-valid BLE packets and 777 CRC-failed packet records. Helper CPU was 18.0% of one core. There were zero USB errors/timeouts, ring drops, malformed frames or receiver overruns. The initial 801 missing sample slices (1,640,448 samples, about 10.25 ms) did not increase during the remaining capture. This shorter startup gap is an observation from one run, not proof that startup loss is solved. Synthetic IQ8 and unaligned packed-14 integration tests also passed with the real receiver executable.
 
-The normal adapter recovered its 5 Gb/s link, address and MTU after each capture. SSH is unavailable during takeover, so the current router launcher cannot supervise an indefinite direct-USB session. This implementation also relies on the stock driver having initialized the adapter before takeover. It does not claim cold-start support, long-duration stability, or removal of USB kernel processing.
+The normal adapter recovered its 5 Gb/s link, address and MTU after each capture. SSH is unavailable during takeover; the updated launcher supervises the viewer locally. This implementation still relies on the stock driver having initialized the adapter before takeover. These short measurements do not establish cold-start support, long-duration stability, or removal of USB kernel processing.
 
 ## Sources and licensing
 

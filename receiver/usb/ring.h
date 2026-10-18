@@ -18,7 +18,8 @@ constexpr uint64_t ring_magic = 0x3142585355424c42ull; // BLBUSXB1, versioned be
 constexpr size_t ring_header_bytes = 4096, slot_count = 512, slot_bytes = 65536;
 struct alignas(64) Header {
     uint64_t magic, version, slots, bytes;
-    uint64_t reserved[4];
+    uint64_t heartbeat, stop_requested; // viewer lease and graceful helper stop
+    uint64_t reserved[2];
     alignas(64) uint64_t head;
     alignas(64) uint64_t tail;
     alignas(64) uint64_t state; // 0: waiting, 1: capturing, 2: stopped
@@ -31,6 +32,8 @@ struct alignas(64) Slot {
 };
 constexpr size_t ring_bytes = ring_header_bytes + sizeof(Slot) * slot_count;
 static_assert(sizeof(Header) <= ring_header_bytes);
+static_assert(offsetof(Header, heartbeat) == 32 && offsetof(Header, stop_requested) == 40);
+static_assert(offsetof(Header, state) == 192 && offsetof(Header, transfers) == 200);
 static_assert(__atomic_always_lock_free(8, nullptr), "requires lock-free cross-process 64-bit atomics");
 inline uint64_t acquire(const uint64_t &v) { return __atomic_load_n(&v, __ATOMIC_ACQUIRE); }
 inline void release(uint64_t &v, uint64_t x) { __atomic_store_n(&v, x, __ATOMIC_RELEASE); }
