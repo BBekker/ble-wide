@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="390" viewBox="0 0 1280 390" role="img" aria-labelledby="title desc">
+<title id="title">BLE Wide</title><desc id="desc">See the Bluetooth LE band at once. An illustrative spectrum and frequency-hopping packet trail.</desc>
+<defs><linearGradient id="bg"><stop stop-color="#101d30"/><stop offset="1" stop-color="#102f39"/></linearGradient><linearGradient id="band" x2="0" y2="1"><stop stop-color="#74dbc2" stop-opacity=".4"/><stop offset="1" stop-color="#74dbc2" stop-opacity=".02"/></linearGradient></defs>
+<rect width="1280" height="390" rx="20" fill="url(#bg)"/>
+<g fill="#8cafa8" font-family="sans-serif" font-size="12" letter-spacing="3"><text x="64" y="60">AIRSPACE / BLUETOOTH OBSERVATORY</text></g>
+<g fill="#f1f7f5" font-family="sans-serif"><text x="60" y="148" font-size="76" font-weight="700" letter-spacing="-3">BLE Wide</text><text x="64" y="195" font-size="24" fill="#b2cdc9">See the Bluetooth LE band at once.</text><text x="64" y="245" font-size="15" fill="#86aba6">40 CHANNELS   /   LE 1M   /   LOCAL PROCESSING</text></g>
+<path d="M64 291h430" stroke="#33525c"/>
+<text x="64" y="329" fill="#9ebbb7" font-family="sans-serif" font-size="15">Wideband capture. GPU channelization. Live exploration.</text>
+<path d="M660 65v260" stroke="#426675" stroke-opacity=".22"/>
+<path d="M686 65v260" stroke="#426675" stroke-opacity=".22"/>
+<path d="M712 65v260" stroke="#426675" stroke-opacity=".22"/>
+<path d="M738 65v260" stroke="#426675" stroke-opacity=".22"/>
+<path d="M764 65v260" stroke="#426675" stroke-opacity=".22"/>
+<path d="M790 65v260" stroke="#426675" stroke-opacity=".22"/>
+<path d="M816 65v260" stroke="#426675" stroke-opacity=".22"/>
+<path d="M842 65v260" stroke="#426675" stroke-opacity=".22"/>
+<path d="M868 65v260" stroke="#426675" stroke-opacity=".22"/>
+<path d="M894 65v260" stroke="#426675" stroke-opacity=".22"/>
+<path d="M920 65v260" stroke="#426675" stroke-opacity=".22"/>
+<path d="M946 65v260" stroke="#426675" stroke-opacity=".22"/>
+<path d="M972 65v260" stroke="#426675" stroke-opacity=".22"/>
+<path d="M998 65v260" stroke="#426675" stroke-opacity=".22"/>
+<path d="M1024 65v260" stroke="#426675" stroke-opacity=".22"/>
+<path d="M1050 65v260" stroke="#426675" stroke-opacity=".22"/>
+<path d="M1076 65v260" stroke="#426675" stroke-opacity=".22"/>
+<path d="M1102 65v260" stroke="#426675" stroke-opacity=".22"/>
+<path d="M1128 65v260" stroke="#426675" stroke-opacity=".22"/>
+<path d="M1154 65v260" stroke="#426675" stroke-opacity=".22"/>
+<path d="M1180 65v260" stroke="#426675" stroke-opacity=".22"/>
+<path d="M660 65h520" stroke="#426675" stroke-opacity=".22"/>
+<path d="M660 91h520" stroke="#426675" stroke-opacity=".22"/>
+<path d="M660 117h520" stroke="#426675" stroke-opacity=".22"/>
+<path d="M660 143h520" stroke="#426675" stroke-opacity=".22"/>
+<path d="M660 169h520" stroke="#426675" stroke-opacity=".22"/>
+<path d="M660 195h520" stroke="#426675" stroke-opacity=".22"/>
+<path d="M660 221h520" stroke="#426675" stroke-opacity=".22"/>
+<path d="M660 247h520" stroke="#426675" stroke-opacity=".22"/>
+<path d="M660 273h520" stroke="#426675" stroke-opacity=".22"/>
+<path d="M660 299h520" stroke="#426675" stroke-opacity=".22"/>
+<path d="M660 325h520" stroke="#426675" stroke-opacity=".22"/>
+<rect x="660" y="65" width="24" height="260" fill="url(#band)"/>
+<rect x="663" y="82" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="663" y="113" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="663" y="144" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="663" y="175" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="663" y="206" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="663" y="237" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="663" y="268" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="663" y="299" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="816" y="65" width="24" height="260" fill="url(#band)"/>
+<rect x="819" y="82" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="819" y="113" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="819" y="144" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="819" y="175" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="819" y="206" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="819" y="237" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="819" y="268" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="819" y="299" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="1154" y="65" width="24" height="260" fill="url(#band)"/>
+<rect x="1157" y="82" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="1157" y="113" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="1157" y="144" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="1157" y="175" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="1157" y="206" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="1157" y="237" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="1157" y="268" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<rect x="1157" y="299" width="18" height="4" fill="none" stroke="#f1cd84" stroke-opacity=".8"/>
+<polyline points="698,91 932,118 750,147 1062,177 880,206 1114,235 984,263 776,294" fill="none" stroke="#8bcff2" stroke-opacity=".4" stroke-dasharray="3 5"/>
+<rect x="690" y="88" width="16" height="6" rx="2" fill="#9edbf1"/>
+<rect x="924" y="115" width="16" height="6" rx="2" fill="#9edbf1"/>
+<rect x="742" y="144" width="16" height="6" rx="2" fill="#9edbf1"/>
+<rect x="1054" y="174" width="16" height="6" rx="2" fill="#9edbf1"/>
+<rect x="872" y="203" width="16" height="6" rx="2" fill="#9edbf1"/>
+<rect x="1106" y="232" width="16" height="6" rx="2" fill="#9edbf1"/>
+<rect x="976" y="260" width="16" height="6" rx="2" fill="#9edbf1"/>
+<rect x="768" y="291" width="16" height="6" rx="2" fill="#9edbf1"/>
+<g fill="#799eaa" font-family="monospace" font-size="12"><text x="660" y="350">2402 MHz</text><text x="1120" y="350">2480 MHz</text></g></svg>
