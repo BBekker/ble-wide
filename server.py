@@ -213,6 +213,7 @@ def main():
     source.add_argument("--stream", help="Attach to an externally managed sample stream; do not take over its adapter")
     source.add_argument("--receive", action="store_true", help="Manage reception automatically (the default)")
     p.add_argument("--transport", choices=["auto", "udp", "usb"], default="auto")
+    p.add_argument("--usb-location", type=lambda s: int(s, 0), help="Explicit USB location ID (hex allowed); works without a stock-driver network interface")
     p.add_argument("--bind", default="10.77.0.10", help="Router export destination on this computer")
     p.add_argument("--ports", type=int, choices=range(1, 65), default=2, metavar="1..64")
     p.add_argument("--name", default="/w1700k-iq4", help="Sample stream created by managed reception")
@@ -222,6 +223,11 @@ def main():
     p.add_argument("--bits", type=int, choices=[4, 8], default=8)
     p.add_argument("--port", type=int, default=8076)
     a = p.parse_args()
+    if a.usb_location is not None:
+        if not 0 < a.usb_location <= 0xffffffff:
+            p.error("--usb-location must be a nonzero 32-bit USB location ID")
+        if a.transport == 'udp' or a.stream or a.events:
+            p.error("--usb-location requires managed USB reception")
     state = State()
     child = None
     runtime = None

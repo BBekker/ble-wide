@@ -8,11 +8,15 @@ import tempfile
 import time
 import unittest
 from stream_shm import Shm
+from live_receiver import RING_BYTES
 ROOT=Path(__file__).resolve().parents[1]
 
 class USBStreamTest(unittest.TestCase):
     def test_usb_iq8_to_samples(self):
         self.check_format('--emit',80)
+
+    def test_large_usb_batch_to_samples(self):
+        self.check_format('--emit-batch',80)
 
     def test_unaligned_usb_packed14_to_samples(self):
         self.check_format('--emit-packed',40)
@@ -31,6 +35,7 @@ class USBStreamTest(unittest.TestCase):
                     try:shm=Shm(name);break
                     except (OSError,AssertionError):time.sleep(.02)
                 self.assertIsNotNone(shm)
+                self.assertEqual(ring.stat().st_size,RING_BYTES)
                 subprocess.run([str(ROOT/'receiver/build/test-usb'),mode,str(ring)],check=True,timeout=10)
                 while time.monotonic()<deadline and shm.position()[1]<slices:time.sleep(.01)
                 self.assertEqual(shm.position()[1],slices)

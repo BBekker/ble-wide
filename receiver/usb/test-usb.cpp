@@ -45,11 +45,16 @@ static std::vector<uint8_t> aggregate(const std::vector<uint8_t>& f,uint32_t sta
  memcpy(a.data()+16,f.data(),f.size());return a;
 }
 int main(int argc,char **argv){
- if(argc==3 && (std::string(argv[1])=="--emit" || std::string(argv[1])=="--emit-packed")){
+ if(argc==3 && (std::string(argv[1])=="--emit" || std::string(argv[1])=="--emit-packed" || std::string(argv[1])=="--emit-batch")){
   usb_rx::TransferRing ring(argv[2],true,getuid());usb_rx::release(ring.header->state,1);
-  for(unsigned i=0;i<40;++i){auto a=aggregate(std::string(argv[1])=="--emit"?frame(i):packed_frame(i));assert(ring.push(a.data(),a.size()));}
-  for(unsigned i=0;i<1000 && usb_rx::acquire(ring.header->tail)<40;++i)usleep(1000);
-  assert(usb_rx::acquire(ring.header->tail)==40);usb_rx::release(ring.header->state,2);return 0;
+  std::vector<uint8_t> batch;unsigned transfers=0;
+  for(unsigned i=0;i<40;++i){
+   auto a=aggregate(std::string(argv[1])=="--emit-packed"?packed_frame(i):frame(i));
+   batch.insert(batch.end(),a.begin(),a.end());
+   if(std::string(argv[1])!="--emit-batch" || i==30 || i==39){while(!ring.push(batch.data(),batch.size()))usleep(1000);batch.clear();++transfers;}
+  }
+  for(unsigned i=0;i<1000 && usb_rx::acquire(ring.header->tail)<transfers;++i)usleep(1000);
+  assert(usb_rx::acquire(ring.header->tail)==transfers);usb_rx::release(ring.header->state,2);return 0;
  }
  usb_rx::Filter filter;
  auto parse=[&](const std::vector<uint8_t>& a){usb_rx::Counters c;usb_rx::aggregate(a.data(),a.size(),filter,c,
@@ -57,6 +62,12 @@ int main(int argc,char **argv){
  for(bool vlan:{false,true})for(bool options:{false,true}){
   auto a=aggregate(frame(0,vlan,options));auto c=parse(a);assert(c.datagrams==1 && c.malformed==0);
   auto b=aggregate(frame(1,vlan,options));a.insert(a.end(),b.begin(),b.end());assert(parse(a).datagrams==2);
+ }
+ // Exercise batches larger than the old 64 KiB limit.
+ for(unsigned count:{15u,31u}){
+  std::vector<uint8_t> batch;
+  for(unsigned i=0;i<count;++i){auto part=aggregate(frame(i));batch.insert(batch.end(),part.begin(),part.end());}
+  assert(batch.size()<=usb_rx::slot_bytes && parse(batch).datagrams==count);
  }
  auto tagged=frame(0,true);tagged.insert(tagged.begin()+14,{0,1,0x81,0});be16(tagged.data()+12,0x88a8);
  assert(parse(aggregate(tagged)).datagrams==1);
@@ -88,6 +99,10 @@ int main(int argc,char **argv){
   int status=0;assert(waitpid(child,&status,0)==child && WIFEXITED(status) && WEXITSTATUS(status)==0);
   uint8_t b=42;assert(!writer.push(&b,1));assert(usb_rx::acquire(writer.header->dropped)==1);
   for(unsigned i=0;i<usb_rx::slot_count;++i){auto s=reader.front();assert(s && s->length==1 && s->data[0]==uint8_t(i));reader.pop();}
+  std::vector<uint8_t> full(usb_rx::slot_bytes,0xa5);
+  assert(!writer.push(full.data(),full.size()+1));
+  assert(writer.push(full.data(),full.size()));
+  assert(reader.front()->length==full.size() && !memcmp(reader.front()->data,full.data(),full.size()));reader.pop();
   assert(!reader.front());assert(writer.push(&b,1));assert(reader.front()->data[0]==42);reader.pop();
  }
  unlink(tmp);

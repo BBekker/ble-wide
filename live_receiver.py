@@ -17,7 +17,7 @@ import time
 
 ROOT = Path(__file__).resolve().parent
 HELPER = ROOT / 'receiver/build/BLEUSBHelper.app'
-RING_BYTES = 4096 + 512 * 65600
+RING_BYTES = 4096 + 32 * (262144 + 64)
 RING_MAGIC = 0x3142585355424c42
 
 
@@ -27,38 +27,41 @@ def descendants(node):
         yield from descendants(child)
 
 
-def adapter_for_address(devices, interfaces, address):
+def adapter_for_address(devices, interfaces, address, location=None):
     """Only select tested hardware on the interface owning the export address."""
     names = []
     for block in re.split(r'(?=^[^\s:]+: flags=)', interfaces, flags=re.M):
         name = block.partition(':')[0]
         if re.search(r'^\s+inet ' + re.escape(address) + r'\s', block, re.M):
-            if 'status: active' in block:
-                names.append(name)
+            names.append(name)
     candidates = []
     for root in devices:
         for node in descendants(root):
             if (node.get('idVendor'), node.get('idProduct'), node.get('bcdDevice')) != (0x0bda, 0x8157, 0x3000):
                 continue
-            if node.get('kUSBCurrentConfiguration') != 1:
-                continue
             attached = {c.get('BSD Name') for c in descendants(node)}
             attached.update(c.get('IORegistryEntryName') for c in descendants(node)
                             if c.get('IOObjectClass') in ('IOEthernetInterface', 'IOSkywalkLegacyEthernetInterface'))
             matching = attached.intersection(names)
-            if len(matching) == 1 and isinstance(node.get('locationID'), int):
-                candidates.append(dict(model='RTL8157', interface=matching.pop(), location=node['locationID']))
+            device_location = node.get('locationID')
+            if not isinstance(device_location, int):
+                continue
+            if location is not None:
+                if device_location == location:
+                    candidates.append(dict(model='RTL8157', interface=next(iter(matching), None), location=device_location))
+            elif len(matching) == 1:
+                candidates.append(dict(model='RTL8157', interface=matching.pop(), location=device_location))
     # A USB object can appear below a hub and as an enumeration root.
     candidates = {c['location']: c for c in candidates}
     return next(iter(candidates.values())) if len(candidates) == 1 else None
 
 
-def detect_adapter(address):
+def detect_adapter(address, location=None):
     if sys.platform != 'darwin':
         return None
     registry = subprocess.check_output(['/usr/sbin/ioreg', '-a', '-r', '-c', 'IOUSBHostDevice'], timeout=10)
     interfaces = subprocess.check_output(['/sbin/ifconfig', '-a'], text=True, timeout=10)
-    return adapter_for_address(plistlib.loads(registry), interfaces, address)
+    return adapter_for_address(plistlib.loads(registry), interfaces, address, location)
 
 
 def terminate(process, timeout=8):
@@ -109,6 +112,21 @@ class USBCapture:
             return 0, 0
         struct.pack_into('<Q', self.mapping, 32, time.monotonic_ns())
         return struct.unpack_from('<QQ', self.mapping, 192)  # state, completed transfers
+
+    def failure_reason(self, default):
+        try:
+            with (self.directory / 'helper.log').open('rb') as log:
+                log.seek(0, 2)
+                log.seek(max(0, log.tell() - 8192))
+                output = log.read().decode('utf-8', errors='replace')
+        except OSError:
+            return default
+        if 'Viewer heartbeat stopped' in output:
+            return 'Direct USB stopped: viewer heartbeat expired (the Mac may have slept)'
+        for line in reversed(output.splitlines()):
+            if line.startswith(('USB input completion:', 'USB input submission:', 'USB framework exception:')):
+                return 'Direct USB stopped: ' + line[:300]
+        return default
 
     def close(self):
         if self.mapping is not None:
@@ -242,28 +260,47 @@ class LiveReceiver:
         self.usb.start()  # exactly one authorization attempt in this viewer run
         deadline = time.monotonic() + 180
         captured_at = None
+        initializing = False
         while not self.stopping.is_set():
             state, transfers = self.usb.counters()
             if self.usb.process.poll() is not None:
-                raise RuntimeError('Direct USB was not authorized or could not start')
+                raise RuntimeError(self.usb.failure_reason('Direct USB was not authorized or could not start'))
             if self.receiver.poll() is not None:
                 raise RuntimeError('USB sample receiver stopped')
+            if state in (4, 5):
+                self.report('usb', 'starting', 'Waiting for direct USB to resume after wake', adapter)
+                deadline = time.monotonic() + 180
+                captured_at = None
+                self.stopping.wait(.1)
+                continue
             if transfers and self._radio_samples_received():
                 break
+            if state == 3 and not initializing:
+                initializing = True
+                self.report('usb', 'starting', 'Initializing adapter and negotiating Ethernet link', adapter)
             if state == 1 and captured_at is None:
                 captured_at = time.monotonic()
                 self.report('usb', 'starting', 'Waiting for radio samples over direct USB', adapter)
             if captured_at is not None and time.monotonic() - captured_at > 15:
                 raise RuntimeError('Direct USB received no radio samples')
             if time.monotonic() >= deadline:
-                raise RuntimeError('Direct USB approval timed out')
+                raise RuntimeError('Direct USB initialization timed out' if initializing else 'Direct USB approval timed out')
             self.stopping.wait(.1)
         if self.stopping.is_set():
             raise InterruptedError()
         self.report('usb', 'receiving', 'Direct USB · RTL8157', adapter)
+        previous_state = 1
         while not self.stopping.wait(.25):
-            if self.usb.process.poll() is not None or self.usb.counters()[0] == 2:
-                raise RuntimeError('Direct USB capture ended')
+            state, _ = self.usb.counters()
+            if self.usb.process.poll() is not None or state == 2:
+                raise RuntimeError(self.usb.failure_reason('Direct USB capture ended'))
+            if state != previous_state:
+                if state in (3, 4, 5):
+                    message = 'Mac sleeping · direct USB will resume after wake' if state == 4 else 'Resuming direct USB after wake or reconnect'
+                    self.report('usb', 'starting', message, adapter)
+                elif state == 1:
+                    self.report('usb', 'receiving', 'Direct USB · RTL8157', adapter)
+                previous_state = state
             if self.receiver.poll() is not None or self.decoder.poll() is not None:
                 raise RuntimeError('Direct USB sample processing stopped')
 
@@ -299,7 +336,7 @@ class LiveReceiver:
                     if self.args.transport != 'udp':
                         self.report('auto', 'detecting', 'Checking the connected adapter')
                         try:
-                            adapter = detect_adapter(self.args.bind)
+                            adapter = detect_adapter(self.args.bind, getattr(self.args, 'usb_location', None))
                         except (OSError, ValueError, subprocess.SubprocessError):
                             pass
                     if adapter:

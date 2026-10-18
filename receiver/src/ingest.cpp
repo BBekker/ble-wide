@@ -304,7 +304,9 @@ void Ingest::work_usb(Worker &w)
     usb_rx::Counters counts;
     while (!stopping_.load(std::memory_order_relaxed)) {
         const auto *slot = w.usb->front();
-        if (!slot) { usleep(100); continue; }
+        // USB batches arrive about every 0.8 ms at 160 Msps IQ8. Avoid
+        // waking ten times per millisecond while waiting for the next batch.
+        if (!slot) { usleep(500); continue; }
         const uint64_t t = now_ns();
         if (slot->length > usb_rx::slot_bytes) ++counts.malformed;
         else usb_rx::aggregate(slot->data, slot->length, filter, counts,

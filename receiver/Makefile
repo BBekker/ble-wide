@@ -32,14 +32,18 @@ install: build/w1700k-stream
 clean:
 	rm -rf build
 
-.PHONY: check-usb usb-helper
+.PHONY: check-usb check-usb-init usb-helper
+build/test-init: usb/test-init.cpp usb/rtl8157-init.h usb/rtl8157-data.h | build
+	$(CXX) $(CXXFLAGS) $< -o $@
+check-usb-init: build/test-init
+	./build/test-init
 build/test-usb: usb/test-usb.cpp usb/frames.h usb/ring.h | build
 	$(CXX) $(CXXFLAGS) $< -o $@
 check-usb: build/test-usb
 	./build/test-usb
 ifeq ($(shell uname -s),Darwin)
 usb-helper: build/BLEUSBHelper.app/Contents/MacOS/rtl8157-helper
-build/BLEUSBHelper.app/Contents/MacOS/rtl8157-helper: usb/helper.mm usb/ring.h usb/Info.plist
+build/BLEUSBHelper.app/Contents/MacOS/rtl8157-helper: usb/helper.mm usb/power.h usb/ring.h usb/rtl8157-init.h usb/rtl8157-data.h usb/Info.plist
 	mkdir -p build/BLEUSBHelper.app/Contents/MacOS
 	cp usb/Info.plist build/BLEUSBHelper.app/Contents/Info.plist
 	/usr/bin/clang++ -std=c++17 -O3 -Wall -Wextra -Werror -fobjc-arc $< -o $@ -framework Foundation -framework IOKit -framework IOUSBHost

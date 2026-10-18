@@ -15,14 +15,15 @@
 
 namespace usb_rx {
 constexpr uint64_t ring_magic = 0x3142585355424c42ull; // BLBUSXB1, versioned below
-constexpr size_t ring_header_bytes = 4096, slot_count = 512, slot_bytes = 65536;
+// ABI v2 allows up to 256 KiB per completion, with an 8 MiB data mapping.
+constexpr size_t ring_header_bytes = 4096, slot_count = 32, slot_bytes = 262144;
 struct alignas(64) Header {
     uint64_t magic, version, slots, bytes;
     uint64_t heartbeat, stop_requested; // viewer lease and graceful helper stop
-    uint64_t reserved[2];
+    uint64_t reconnect_requested, reserved; // increment to reopen this capture's adapter
     alignas(64) uint64_t head;
     alignas(64) uint64_t tail;
-    alignas(64) uint64_t state; // 0: waiting, 1: capturing, 2: stopped
+    alignas(64) uint64_t state; // 0: waiting, 1: capturing, 2: stopped, 3: initializing PHY, 4: asleep, 5: resuming
     uint64_t transfers, usb_bytes, dropped, errors, pid;
 };
 struct alignas(64) Slot {
@@ -69,10 +70,10 @@ public:
             if (map_ == MAP_FAILED) throw std::runtime_error("cannot map USB ring");
             header = static_cast<Header *>(map_);
             if (created) {
-                header->version=1;header->slots=slot_count;header->bytes=slot_bytes;
+                header->version=2;header->slots=slot_count;header->bytes=slot_bytes;
                 release(header->magic,ring_magic);
             }
-            if (acquire(header->magic)!=ring_magic || header->version!=1 || header->slots!=slot_count || header->bytes!=slot_bytes)
+            if (acquire(header->magic)!=ring_magic || header->version!=2 || header->slots!=slot_count || header->bytes!=slot_bytes)
                 throw std::runtime_error("USB ring ABI mismatch");
             if (writer && (acquire(header->head) || acquire(header->tail) || acquire(header->state)))
                 throw std::runtime_error("use a fresh USB ring for each capture");

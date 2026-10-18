@@ -9,7 +9,7 @@ import tempfile
 import time
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -38,13 +38,20 @@ class DetectionTest(unittest.TestCase):
         result = live.adapter_for_address([device('en0', 1), device()], INTERFACES, '10.77.0.10')
         self.assertEqual(result, dict(model='RTL8157', interface='en10', location=0x2200000))
 
-    def test_unknown_revision_configuration_and_inactive_link_are_not_claimed(self):
-        for key, value in [('idProduct', 0x8156), ('bcdDevice', 0x3100), ('kUSBCurrentConfiguration', 2)]:
+    def test_unknown_revision_is_not_claimed(self):
+        for key, value in [('idProduct', 0x8156), ('bcdDevice', 0x3100)]:
             candidate = device();candidate[key] = value
             with self.subTest(key=key):
                 self.assertIsNone(live.adapter_for_address([candidate], INTERFACES, '10.77.0.10'))
-        self.assertIsNone(live.adapter_for_address([device()], INTERFACES.replace('status: active', 'status: inactive'), '10.77.0.10'))
         self.assertIsNone(live.adapter_for_address([device('en0')], INTERFACES, '10.77.0.10'))
+
+    def test_cold_adapter_can_be_selected_without_link_or_vendor_configuration(self):
+        candidate = device();candidate['kUSBCurrentConfiguration'] = 2
+        self.assertIsNotNone(live.adapter_for_address([candidate], INTERFACES.replace('status: active', 'status: inactive'), '10.77.0.10'))
+        candidate['IORegistryEntryChildren'] = []
+        self.assertIsNone(live.adapter_for_address([candidate], INTERFACES, '10.77.0.10'))
+        self.assertEqual(live.adapter_for_address([candidate], INTERFACES, '10.77.0.10', 0x2200000)['location'], 0x2200000)
+        self.assertIsNone(live.adapter_for_address([candidate], INTERFACES, '10.77.0.10', 0x3300000))
 
     def test_ambiguous_adapters_are_not_claimed(self):
         self.assertIsNone(live.adapter_for_address([device(), device(location=2)], INTERFACES, '10.77.0.10'))
@@ -115,6 +122,44 @@ class SelectionTest(unittest.TestCase):
 
 
 class CaptureTest(unittest.TestCase):
+    def test_sleep_wake_keeps_one_usb_authorization_and_pipeline(self):
+        args = SimpleNamespace(name='/test', bind='127.0.0.1', ports=1)
+        runtime = live.LiveReceiver(args, State())
+        runtime.receiver = Mock();runtime.receiver.poll.return_value = None
+        runtime.decoder = Mock();runtime.decoder.poll.return_value = None
+        runtime.stopping = Mock()
+        runtime.stopping.is_set.return_value = False
+        runtime.stopping.wait.side_effect = [False, False, False, False, True]
+        capture = Mock();capture.process.poll.return_value = None
+        capture.counters.side_effect = [(1, 10), (4, 10), (5, 10), (3, 10), (1, 20)]
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(live.subprocess, 'run'), patch.object(live, 'USBCapture', return_value=capture), \
+             patch.object(runtime, '_start_receiver') as receiver, \
+             patch.object(runtime, '_start_decoder') as decoder, \
+             patch.object(runtime, '_radio_samples_received', return_value=True), \
+             patch.object(runtime, 'report') as report:
+            runtime.directory = Path(tmp)
+            runtime._run_usb(dict(model='RTL8157'))
+        capture.start.assert_called_once()
+        receiver.assert_called_once();decoder.assert_called_once()
+        capture.close.assert_not_called()
+        messages = [call.args[2] for call in report.call_args_list]
+        self.assertTrue(any('sleeping' in text for text in messages))
+        self.assertTrue(any('Resuming' in text for text in messages))
+        self.assertEqual(report.call_args.args[:3], ('usb', 'receiving', 'Direct USB · RTL8157'))
+
+    def test_usb_failure_reason_preserves_heartbeat_and_io_diagnostics(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            capture = live.USBCapture(Path(tmp), Path(tmp)/'ring', {})
+            self.assertEqual(capture.failure_reason('ended'), 'ended')
+            log = Path(tmp)/'helper.log'
+            log.write_text('Viewer heartbeat stopped; releasing USB adapter\nrtl8157-helper: USB receive failed\n')
+            self.assertIn('heartbeat expired', capture.failure_reason('ended'))
+            log.write_text('USB input completion: 0xe00002ed\nrtl8157-helper: USB receive failed\n')
+            self.assertIn('0xe00002ed', capture.failure_reason('ended'))
+            log.write_text('normal shutdown\n')
+            self.assertEqual(capture.failure_reason('ended'), 'ended')
+
     @unittest.skipUnless((ROOT / 'build/w1700k-ble-wide').exists(), 'build the receiver and decoder first')
     def test_managed_udp_receives_samples_and_stops_both_processes(self):
         args = SimpleNamespace(transport='udp', bind='127.0.0.1', ports=1,
