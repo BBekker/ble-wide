@@ -196,6 +196,44 @@
     }
   }
 
-  const api={describe,group,decode,encryptionState,advertisement,DeviceRegistry};
+  // View-only filtering: retain every captured packet, match data by connection
+  // identity and primary-channel traffic by the addresses carried in its PDU.
+  class DeviceFilter {
+    constructor(keys=[]) {
+      this.selected=new Set(keys.filter(k=>/^(public|random):(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$/.test(k)));
+      this.cache=new WeakMap();
+    }
+    matchesConnection(c) {
+      if(!this.selected.size)return true;
+      if(!c)return false;
+      return ['central','peripheral'].some(role=>{
+        const address=(c[role]||'').toLowerCase(),random=c[role+'_random'];
+        if(!address)return false;
+        return typeof random==='boolean'?this.selected.has((random?'random:':'public:')+address):
+          this.selected.has('public:'+address)||this.selected.has('random:'+address);
+      });
+    }
+    packetKeys(p) {
+      if(p.device_key&&(parseInt(p.pdu?.slice(0,2),16)&15)!==1)return [p.device_key];
+      if(this.cache.has(p))return this.cache.get(p);
+      const keys=[];
+      if(p.access_address==='8e89bed6'&&/^(?:[0-9a-f]{2})+$/i.test(p.pdu||'')) {
+        const b=Uint8Array.from(p.pdu.match(/../g),v=>parseInt(v,16)),type=b[0]&15;
+        const add=(offset,random)=>{if(b.length>=offset+6)keys.push((random?'random:':'public:')+Array.from(b.slice(offset,offset+6)).reverse().map(v=>v.toString(16).padStart(2,'0')).join(':'));};
+        if(b.length>=8&&b.length===b[1]+2&&type<=6) {
+          add(2,!!(b[0]&64));
+          if([1,3,5].includes(type))add(8,!!(b[0]&128));
+        }
+      }
+      this.cache.set(p,keys);return keys;
+    }
+    matchesPacket(p,connections) {
+      if(!this.selected.size)return true;
+      if(p.access_address!=='8e89bed6')return this.matchesConnection(connections.get(p.connection_id));
+      return this.packetKeys(p).some(key=>this.selected.has(key));
+    }
+  }
+
+  const api={describe,group,decode,encryptionState,advertisement,DeviceRegistry,DeviceFilter};
   if(typeof module==='object'&&module.exports)module.exports=api;else root.PacketModel=api;
 })(typeof globalThis==='object'?globalThis:this);

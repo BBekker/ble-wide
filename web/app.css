@@ -17,3 +17,8 @@
 .key-crc-failed{background:#ff8585!important}
 .crc-failed{color:#a32f3a!important;background:rgba(255,100,100,.06)!important;border-left:2px solid #ff8585}
 .crc-failed .decoded-summary{color:#a32f3a}
+
+/* Device selection remains available while the traffic view is filtered. */
+.device-filter-banner{display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:#edf6f3;border:1px solid #cbe2db;border-radius:9px;padding:14px 18px;margin-bottom:20px;color:#326f60}
+.device-filter-banner[hidden]{display:none}.device-filter-banner strong{display:block;font-size:12px}.device-filter-banner span{display:block;font-size:11px;margin-top:5px}.device-filter-chips{display:flex;flex-wrap:wrap;gap:6px;flex:1}.device-chip{font-size:11px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:white;color:#326f60;border-color:#cbe2db}.device-selection-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 20px 15px;font-size:11px;color:var(--muted)}
+.device-head,.device-row{grid-template-columns:22px minmax(190px,2fr) minmax(155px,1fr) 100px 100px}.device-row{cursor:pointer}.device-row:hover{background:#f5faf8}.device-row.selected{background:#edf6f3}.devices-panel .device-row input{width:15px;height:15px;accent-color:#277d81;margin:0}.device-row:focus-within{outline:2px solid #277d81;outline-offset:-2px}@media(max-width:700px){.device-head,.device-row{min-width:680px}.device-filter-banner>div:first-child{width:100%}.device-selection-toolbar{flex-wrap:wrap}}

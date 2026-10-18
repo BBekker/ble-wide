@@ -18,7 +18,12 @@
     frozen:null, span:30, changed:true, filtered:[], filterChannel:null, filterQuery:'', filterKind:'', pausedList:false, listFrozen:[], showCrcFailures:true};
   try {store.showCrcFailures=localStorage.getItem('airspace-show-crc-failures')!=='false';} catch {}
   $('show-crc-failures').checked=store.showCrcFailures;
-  const visiblePacket=p=>store.showCrcFailures||p.crc_valid!==false;
+  let savedDevices=[];
+  try {const saved=JSON.parse(localStorage.getItem('airspace-device-filter')||'[]');if(Array.isArray(saved))savedDevices=saved;} catch {}
+  const deviceFilter=new PacketModel.DeviceFilter(savedDevices);
+  const visiblePacket=p=>(store.showCrcFailures||p.crc_valid!==false)&&deviceFilter.matchesPacket(p,store.connections);
+  const visibleConnection=c=>deviceFilter.matchesConnection(c);
+  const deviceRows=new Map();let filterSignature='';
   let devices=new PacketModel.DeviceRegistry(),deviceRenderAt=-Infinity;
   const rowNodes = new Map();
   const connectionPackets = new ConnectionPacketView();
@@ -95,7 +100,7 @@
   function refilter(){store.filtered=store.packets.filter(matches);$('packet-scroll').scrollTop=0;renderList();}
   function receive(data){
     if(store.session!==data.session){
-      devices=new PacketModel.DeviceRegistry();deviceRenderAt=-Infinity;store.session=data.session;autoLevels=new PlotMath.AutoLevels();lastGainUpdate=-Infinity;lastGainEnd=null;store.packets=[];store.spectrum=[];store.connections.clear();store.byConnection.clear();store.filtered=[];
+      devices=new PacketModel.DeviceRegistry();deviceRenderAt=-Infinity;for(const r of deviceRows.values())r.row.remove();deviceRows.clear();store.session=data.session;autoLevels=new PlotMath.AutoLevels();lastGainUpdate=-Infinity;lastGainEnd=null;store.packets=[];store.spectrum=[];store.connections.clear();store.byConnection.clear();store.filtered=[];
       store.cursor=store.spectrumCursor=0;store.selected=null;store.autoSelect=true;store.frozen=null;previousRate=null;
       $('timeline-back').value=0;$('timeline-freeze').textContent='Ⅱ Pause';$('timeline-freeze').setAttribute('aria-pressed','false');
       store.listFrozen=[];detailSignature='';rowNodes.clear();$('connection-rows').replaceChildren();
@@ -115,7 +120,7 @@
     }
     if(store.packets.length>LIMIT){
       store.packets.splice(0,store.packets.length-LIMIT);
-      const first=store.packets[0].id;
+      const first=store.packets[0]?.id||null;
       store.filtered=store.filtered.filter(p=>p.id>=first);
       for(const [id,points] of store.byConnection){let cut=0;while(cut<points.length&&points[cut].id<first)cut++;if(cut)points.splice(0,cut);}
     }
@@ -132,8 +137,9 @@
       store.connections.set(c.id,c);
     }
     for(const id of store.connections.keys())if(!keep.has(id)){store.connections.delete(id);store.byConnection.delete(id);}
-    if(store.selected&&!keep.has(store.selected))store.selected=null;
-    if(store.autoSelect&&store.connections.size)store.selected=[...store.connections.values()].sort((a,b)=>Number(b.observed)-Number(a.observed)||b.count-a.count||a.start-b.start)[0].id;
+    if(deviceFilter.selected.size)store.filtered=store.packets.filter(matches);
+    if(store.selected&&(!keep.has(store.selected)||!visibleConnection(store.connections.get(store.selected)))){store.selected=null;detailSignature='';}
+    if(store.autoSelect&&store.connections.size)store.selected=[...store.connections.values()].filter(visibleConnection).sort((a,b)=>Number(b.observed)-Number(a.observed)||b.count-a.count||a.start-b.start)[0]?.id||null;
     store.cursor=data.cursor;store.spectrumCursor=data.spectrum_cursor||0;store.status=data.status;store.gaps=data.gaps||[];store.receiver=data.receiver||{};
     store.active=data.active;store.connected=true;store.lastMessage=performance.now();
     store.clock=Math.max(data.capture_s||0,store.spectrum.length?store.spectrum[store.spectrum.length-1].end_s:0);
@@ -159,7 +165,7 @@
     setText('packets',number(store.status.packets));setText('packet-rate',number(Math.max(0,Math.round(packetRate)))+' packets / sec');
     setText('connection-total',store.connections.size);
     const setups=[...store.connections.values()].filter(c=>c.observed).length;
-    setText('setup-total',setups+' setups · '+(store.connections.size-setups)+' joined midstream');setText('connection-count',store.connections.size);
+    setText('setup-total',setups+' setups · '+(store.connections.size-setups)+' joined midstream');setText('connection-count',deviceFilter.selected.size?[...store.connections.values()].filter(visibleConnection).length+' / '+store.connections.size:store.connections.size);
     const channels=store.status.channels||[];const seen=channels.filter(c=>c.packets>0).length;
     $('seen').replaceChildren(document.createTextNode(seen+' '),node('em','/ 40'));
     const missing=(store.status.lost_samples||0)/160000;
@@ -171,14 +177,14 @@
     syncRows();inspector();connectionPackets.update(store);renderList();renderDevices();
   }
   function syncRows(){
-    let rows=[...store.connections.values()];const mode=$('timeline-filter').value;
+    let rows=[...store.connections.values()].filter(visibleConnection);const mode=$('timeline-filter').value;
     if(mode==='observed')rows=rows.filter(c=>c.observed);
     if(mode==='active')rows=rows.filter(c=>!c.ended&&!c.quiet);
     rows.sort((a,b)=>Number(b.observed)-Number(a.observed)||b.count-a.count||a.start-b.start);
     const list=$('connection-rows'), ids=new Set(rows.map(c=>c.id));
     for(const [id,r] of rowNodes)if(!ids.has(id)){r.row.remove();rowNodes.delete(id);}
     const empty=list.querySelector('.timeline-empty');
-    if(!rows.length){if(!empty){const box=node('div',null,'timeline-empty');box.append(node('div','╎ ╎ ╎ ╎ ╎','empty-signal'),node('b',mode==='observed'?'Waiting for a connection setup':'Listening for connections'),node('span',mode==='observed'?'New CONNECT_IND packets will appear here. Existing connections are available under “All connections”.':'Each connection gets a lane. Packet marks will follow its activity across the band.'));list.append(box);}return;}
+    if(!rows.length){if(empty)empty.remove();{const box=node('div',null,'timeline-empty');box.append(node('div','╎ ╎ ╎ ╎ ╎','empty-signal'),node('b',deviceFilter.selected.size?'No matching connections':mode==='observed'?'Waiting for a connection setup':'Listening for connections'),node('span',deviceFilter.selected.size?'Waiting for connections involving the selected devices. Connections with unknown device addresses are hidden.':mode==='observed'?'New CONNECT_IND packets will appear here. Existing connections are available under “All connections”.':'Each connection gets a lane. Packet marks will follow its activity across the band.'));list.append(box);}return;}
     if(empty)empty.remove();
     rows.forEach((c,index)=>{
       let r=rowNodes.get(c.id);
@@ -227,17 +233,44 @@
     const all=[...devices.devices.values()],query=$('device-search').value.toLowerCase();
     const rows=all.filter(d=>(d.name+' '+d.address).toLowerCase().includes(query)).sort((a,b)=>Number(!!b.name)-Number(!!a.name)||(a.name||a.address).localeCompare(b.name||b.address));
     setText('device-count',all.filter(d=>d.name).length+' named / '+all.length+' addresses');
-    const fragment=document.createDocumentFragment();
-    for(const d of rows.slice(0,300)){
-      const row=node('div',null,'device-row'),identity=node('div');
-      identity.append(node('b',d.name||'Unnamed device'),node('small',d.address+' · '+(d.random?'random':'public')));
-      row.append(identity,node('span',d.name?(d.complete?'Complete':'Shortened')+' · '+d.source:'No name captured'),node('span',Number.isFinite(d.signal)?d.signal.toFixed(1):'—','mono'),node('span',Math.max(0,store.clock-d.last).toFixed(1)+' s ago','mono'));
-      fragment.append(row);
-    }
-    if(!rows.length)fragment.append(node('p',query?'No matching devices.':'Listening for advertisements…','chart-note'));
-    $('device-rows').replaceChildren(fragment);
+    const list=$('device-rows'),shown=rows.slice(0,300),keep=new Set(shown.map(d=>d.key));
+    for(const [key,r] of deviceRows)if(!keep.has(key)){r.row.remove();deviceRows.delete(key);}
+    list.querySelector('.chart-note')?.remove();
+    shown.forEach((d,index)=>{
+      let r=deviceRows.get(d.key);
+      if(!r){
+        const row=node('label',null,'device-row'),check=node('input'),identity=node('span'),name=node('b'),address=node('small'),source=node('span'),signal=node('span',null,'mono'),seen=node('span',null,'mono');
+        check.type='checkbox';check.onchange=()=>{if(check.checked)deviceFilter.selected.add(d.key);else deviceFilter.selected.delete(d.key);applyDeviceFilter();};
+        identity.append(name,address);row.append(check,identity,source,signal,seen);r={row,check,name,address,source,signal,seen};deviceRows.set(d.key,r);
+      }
+      r.check.checked=deviceFilter.selected.has(d.key);r.row.classList.toggle('selected',r.check.checked);
+      r.check.setAttribute('aria-label','Filter '+(d.name||'Unnamed device')+' '+d.address+' '+(d.random?'random':'public'));
+      r.name.textContent=d.name||'Unnamed device';r.address.textContent=d.address+' · '+(d.random?'random':'public');
+      r.source.textContent=d.name?(d.complete?'Complete':'Shortened')+' · '+d.source:'No name captured';
+      r.signal.textContent=Number.isFinite(d.signal)?d.signal.toFixed(1):'—';r.seen.textContent=Math.max(0,store.clock-d.last).toFixed(1)+' s ago';
+      if(list.children[index]!==r.row)list.insertBefore(r.row,list.children[index]||null);
+    });
+    if(!rows.length)list.append(node('p',query?'No matching devices.':'Listening for advertisements…','chart-note'));
+    renderDeviceFilter();
     setText('device-retention',`Showing ${Math.min(300,rows.length)} of ${rows.length} matching addresses · Names retained while this capture is open (up to 10,000 addresses).`);
   }
+  function renderDeviceFilter(){
+    const keys=[...deviceFilter.selected],signature=JSON.stringify(keys.map(key=>[key,devices.devices.get(key)?.name]));
+    if(signature===filterSignature)return;filterSignature=signature;
+    $('device-filter-banner').hidden=!keys.length;
+    setText('device-filter-summary',keys.length+' selected device'+(keys.length===1?'':'s'));
+    setText('device-selection-count',keys.length?keys.length+' selected · showing matching traffic':'Select devices to filter connections and advertisements');
+    $('devices-show-all').disabled=!keys.length;
+    const chips=keys.map(key=>{const d=devices.devices.get(key),button=node('button',(d?.name||key.slice(key.indexOf(':')+1))+' ×','device-chip');button.type='button';button.title=key;button.setAttribute('aria-label','Remove device filter '+key);button.onclick=()=>{deviceFilter.selected.delete(key);applyDeviceFilter();};return button;});
+    $('device-filter-chips').replaceChildren(...chips);
+  }
+  function applyDeviceFilter(){
+    try{localStorage.setItem('airspace-device-filter',JSON.stringify([...deviceFilter.selected]));}catch{}
+    if(store.selected&&!visibleConnection(store.connections.get(store.selected)))store.selected=null;
+    store.autoSelect=!store.selected;detailSignature='';tooltip.hidden=true;pointerPoints=[];store.changed=true;store.revision++;
+    refilter();syncRows();inspector();connectionPackets.update(store);renderDevices(true);
+  }
+  for(const id of ['devices-show-all','device-filter-clear'])$(id).onclick=()=>{deviceFilter.selected.clear();applyDeviceFilter();};
   $('device-search').oninput=()=>renderDevices(true);
   function surface(canvas,height){const w=Math.max(1,Math.round(canvas.clientWidth)),h=height,ratio=Math.min(2,devicePixelRatio||1);if(canvas.width!==Math.round(w*ratio)||canvas.height!==Math.round(h*ratio)){canvas.width=w*ratio;canvas.height=h*ratio;}const ctx=canvas.getContext('2d');ctx.setTransform(ratio,0,0,ratio,0,0);ctx.clearRect(0,0,w,h);return {ctx,w,h};}
   function drawTimeline(range){
@@ -288,15 +321,29 @@
     ctx.strokeStyle='#ffffff0c';ctx.lineWidth=.5;for(let i=1;i<40;i++){ctx.beginPath();ctx.moveTo(i*w/40,0);ctx.lineTo(i*w/40,h);ctx.stroke();}
     for(const g of store.gaps)if(g.end>=start&&g.start<=end){ctx.fillStyle='#d67f7f30';const a=Math.max(0,(end-g.end)/span*h),b=Math.min(h,(end-g.start)/span*h);ctx.fillRect(0,a,w,Math.max(2,b-a));}
     pointerPoints=[];
-    if($('waterfall-packets').checked){
+    let advertisingCount=0,dataCount=0;
+    const highlights=$('waterfall-packets').checked,filtered=deviceFilter.selected.size>0;
+    if(highlights){
       for(let i=store.packets.length-1;i>=0;i--){const p=store.packets[i],t=p.capture_s;if(t<start-.003)break;if(t<start||t>end||!visiblePacket(p))continue;
-        const x=column.get(p.channel)*w/40+1,y=(end-t)/span*h,selected=p.connection_id&&p.connection_id===store.selected;
-        const height=Math.max(2.5,Math.min(14,(p.pdu.length/2+8)*8e-6/span*h));
-        ctx.strokeStyle=p.crc_valid===false?'#ff8585':selected?'#9affdd':p.access_address===ADV?'#f5cb80':'#8ecbfa';ctx.globalAlpha=selected?1:.72;ctx.lineWidth=selected?1.5:1;
-        ctx.strokeRect(x,Math.min(h-height,y),Math.max(2,w/40-2),height);pointerPoints.push({x,y,width:w/40,height,packet:p});
+        const advertising=p.access_address===ADV;
+        if(advertising)advertisingCount++;else dataCount++;
+        const x=column.get(p.channel)*w/40+2,selected=p.connection_id&&p.connection_id===store.selected;
+        const emphasized=filtered||selected;
+        const height=Math.max(3,Math.min(14,(p.pdu.length/2+8)*8e-6/span*h));
+        const y=Math.min(h-height-1,Math.max(1,(end-t)/span*h)),width=Math.max(2,w/40-4);
+        // A dark outer stroke separates packet marks from equally bright FFT bins.
+        // Device-filtered advertisements need the same emphasis as selected data.
+        ctx.globalAlpha=1;ctx.strokeStyle='#07121f';ctx.lineWidth=emphasized?4:3;
+        ctx.strokeRect(x,y,width,height);
+        ctx.strokeStyle=p.crc_valid===false?'#ff8585':selected?'#9affdd':advertising?'#ffe19a':'#8ecbfa';
+        ctx.globalAlpha=emphasized?1:.9;ctx.lineWidth=emphasized?2:1;
+        ctx.strokeRect(x,y,width,height);pointerPoints.push({x,y,width,height,packet:p});
       }
       ctx.globalAlpha=1;
     }
+    setText('waterfall-packet-summary',highlights
+      ?`${number(advertisingCount)} advertising-channel · ${number(dataCount)} data packets in view${filtered?' · selected devices only':''}`
+      :'Packet highlights are off');
     ctx.font='9px ui-monospace,monospace';ctx.textAlign='right';for(let k=1;k<4;k++){const y=k*h/4;ctx.fillStyle='#0c1d29bd';ctx.fillRect(w-42,y-9,42,13);ctx.fillStyle='#b4c5d0';ctx.fillText('−'+(span*k/4).toFixed(span<1?2:1)+'s',w-4,y);}
     ctx.textAlign='left';
   }
